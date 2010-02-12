@@ -16,21 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
+require "main_settings"
+require "socket"
 
-require "test/unit"
-
-# Update load path to include main src directory
-$:.push(File.join(File.dirname(__FILE__), "..", "src"))
-$DATA_BASE=File.join(File.dirname(__FILE__), "data")
-
-
-if (ARGV.size == 0)
-    # Require all of the test_*'s
-    Dir.glob("test_*.rb") { |f|
-        require f
-    }
-else
-    ARGV.each { |arg|
-        require "test_#{arg}.rb"
-    }
+class TestMainSettings < Test::Unit::TestCase
+    def test_main
+        sa = MainSettings.instance()
+        hostname = Socket.gethostname
+        assert_equal(hostname, sa.hostname)
+    end
 end

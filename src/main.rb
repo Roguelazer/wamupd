@@ -29,3 +29,5 @@
 $:.push(File.dirname(__FILE__))
 
 require 'avahi_service'
+
+$settings = MainSettings.instance()

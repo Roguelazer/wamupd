@@ -16,21 +16,20 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
+require "socket"
+require "singleton"
 
-require "test/unit"
+# Simple singleton for storing app-side configuration-type
+# things
+class MainSettings
+    include Singleton
 
-# Update load path to include main src directory
-$:.push(File.join(File.dirname(__FILE__), "..", "src"))
-$DATA_BASE=File.join(File.dirname(__FILE__), "data")
+    # The current hostname
+    attr_reader :hostname
 
-
-if (ARGV.size == 0)
-    # Require all of the test_*'s
-    Dir.glob("test_*.rb") { |f|
-        require f
-    }
-else
-    ARGV.each { |arg|
-        require "test_#{arg}.rb"
-    }
+    # Constructor. Use the instance() function
+    # to actually initialize
+    def initialize
+        @hostname = Socket.gethostname()
+    end
 end
