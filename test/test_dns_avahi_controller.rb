@@ -17,27 +17,12 @@
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
 require "test/unit"
-require "main_settings"
-require "socket"
+require "avahi_service"
+require "dns_avahi_controller"
 
-class TestMainSettings < Test::Unit::TestCase
-    def test_main
-        sa = MainSettings.instance()
-        sa.clear
-        hostname = Socket.gethostname
-        assert_equal(hostname, sa.hostname)
-    end
-
-    def test_yaml
-        sa = MainSettings.instance()
-        sa.clear
-        sa.load_from_yaml(File.join($DATA_BASE, "config.yaml"))
-        assert_equal("test", sa.hostname)
-        assert_equal(5352, sa.dns_port)
-        assert_equal("test.example.com", sa.dns_server)
-        assert_equal("test.example.com", sa.dnssec_key_name)
-        assert_equal("qvdra/qmRNop12eD/1Ez4Dr==", sa.dnssec_key_value)
-
-
+class TestDNSAvahiController < Test::Unit::TestCase
+    def test_1
+        avahis = AvahiService.load_from_directory($DATA_BASE)
+        dc = DNSAvahiController.new(avahis)
     end
 end

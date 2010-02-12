@@ -1,0 +1,7 @@
+---
+hostname: "test"
+dns_server: "test.example.com"
+dns_port: 5352
+dnssec_key_name: "test.example.com"
+dnssec_key_hmac: "qvdra/qmRNop12eD/1Ez4Dr=="
+...

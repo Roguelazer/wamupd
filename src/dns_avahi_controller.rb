@@ -16,28 +16,18 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
-require "test/unit"
-require "main_settings"
-require "socket"
+require "avahi_service"
+require "dnsruby"
 
-class TestMainSettings < Test::Unit::TestCase
-    def test_main
-        sa = MainSettings.instance()
-        sa.clear
-        hostname = Socket.gethostname
-        assert_equal(hostname, sa.hostname)
-    end
-
-    def test_yaml
-        sa = MainSettings.instance()
-        sa.clear
-        sa.load_from_yaml(File.join($DATA_BASE, "config.yaml"))
-        assert_equal("test", sa.hostname)
-        assert_equal(5352, sa.dns_port)
-        assert_equal("test.example.com", sa.dns_server)
-        assert_equal("test.example.com", sa.dnssec_key_name)
-        assert_equal("qvdra/qmRNop12eD/1Ez4Dr==", sa.dnssec_key_value)
-
-
+# Coordinate between a set of Avahi Services and DNS records
+class DNSAvahiController
+    # Initialize the controller. Takes an array of services
+    def initialize(services)
+        sa = MainSettings.instance
+        @services = services
+        @resolver = Dnsruby::Resolver.new({
+            :nameserver => sa.dns_server,
+            :port => sa.dns_port
+        })
     end
 end
