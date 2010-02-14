@@ -35,10 +35,32 @@ class AvahiService
         attr_reader :hostname
         attr_reader :port
         attr_reader :txt
+        attr_reader :domainname
 
         # Get the subtype as Apple displays it
         def subtype_display
             "#{@type},#{@subtype}"
+        end
+
+        def type_in_zone
+            sa = MainSettings.instance
+            return @type + "." + sa.zone
+        end
+
+        def target
+            t = ""
+            sa = MainSettings.instance
+            if (@hostname.nil?)
+                t += sa.hostname
+            else
+                t += @hostname
+            end
+            t += "."
+            if (@domainname.nil?)
+                t += sa.zone
+            else
+                t += @domainname
+            end
         end
 
         # Initialize from an XML node
@@ -55,6 +77,8 @@ class AvahiService
                     @port = c.content.to_i
                 when "txt-record"
                     @txt = c.content
+                when "domain-name"
+                    @domainname = c.content
                 end
             }
         end

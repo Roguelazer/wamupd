@@ -41,11 +41,31 @@ class MainSettings
     # DNSSEC key value (usually, a HMAC-MD5 private key)
     attr_reader :dnssec_key_value
 
+    # Zone
+    attr_reader :zone
+
+    # Default TTL of records
+    attr_reader :ttl
+
+    # Default priority of SRV records
+    attr_reader :priority
+
+    # Default weight of SRV records
+    attr_reader :weight
+
     # Constructor. Use the instance() function
     # to actually initialize
     def initialize
         @hostname = Socket.gethostname()
         @dns_port = 53
+        @ttl = 86400
+        @priority = 1
+        @weight = 5
+        @resolver = nil
+    end
+
+    def using_dnssec?
+        return (not @dnssec_key_name.nil?)
     end
 
     # Load some more settings from a YAML file
@@ -56,7 +76,11 @@ class MainSettings
             "dns_server" => :@dns_server,
             "dns_port" => :@dns_port,
             "dnssec_key_name" => :@dnssec_key_name,
-            "dnssec_key_hmac" => :@dnssec_key_value
+            "dnssec_key_hmac" => :@dnssec_key_value,
+            "zone" => :@zone,
+            "ttl" => :@ttl,
+            "srv_priority" => :@priority,
+            "srv_weight" => :@weight
         }
         properties_map.each { |k,v|
             if (y.has_key?(k))
@@ -69,4 +93,33 @@ class MainSettings
     def clear
         initialize
     end
+
+    # Get a Dnsruby::Resolver
+    def resolver
+        if (@resolver.nil?)
+            make_resolver
+        end
+        return @resolver
+    end
+
+    def make_resolver
+        if self.using_dnssec?
+            ts = Dnsruby::RR.new_from_hash({
+                :type=>Dnsruby::Types.TSIG,
+                :klass=>Dnsruby::Classes.ANY,
+                :name=>self.dnssec_key_name,
+                :key=>self.dnssec_key_value,
+                :algorithm=>Dnsruby::RR::TSIG::HMAC_MD5
+            })
+        end
+        @resolver = Dnsruby::Resolver.new({
+            :nameserver => self.dns_server,
+            :port => self.dns_port,
+            :tsig => ts,
+            :dnssec => true
+        })
+        
+    end
+
+    private :make_resolver
 end

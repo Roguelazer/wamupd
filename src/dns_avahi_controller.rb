@@ -17,17 +17,49 @@
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
 require "avahi_service"
+require "main_settings"
 require "dnsruby"
 
 # Coordinate between a set of Avahi Services and DNS records
 class DNSAvahiController
+    attr_reader :resolver
+
     # Initialize the controller. Takes an array of services
     def initialize(services)
-        sa = MainSettings.instance
+        @sa = MainSettings.instance
         @services = services
-        @resolver = Dnsruby::Resolver.new({
-            :nameserver => sa.dns_server,
-            :port => sa.dns_port
-        })
+        @resolver = @sa.resolver
+    end
+
+    def publish_all
+        update = Dnsruby::Update.new(@sa.zone, "IN")
+        @services.each { |service|
+            service.each { |service_entry|
+                puts update.add(service_entry.type_in_zone,
+                                Dnsruby::Types.SRV, @sa.ttl,
+                                "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
+            }
+        }
+        begin
+            @resolver.send_message(update)
+        rescue Exception => e
+            puts "Registration failed: #{e}"
+        end
+    end
+
+    def unpublish_all
+        update = Dnsruby::Update.new(@sa.zone, "IN")
+        @services.each { |service|
+            service.each { |service_entry|
+                puts update.delete(service_entry.type_in_zone,
+                                Dnsruby::Types.SRV,
+                                "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
+            }
+        }
+        begin
+            @resolver.send_message(update)
+        rescue Exception => e
+            puts "Deletion failed: #{e}"
+        end
     end
 end

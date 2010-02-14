@@ -45,6 +45,10 @@ class TestAvahiService < Test::Unit::TestCase
         assert(@simple.valid)
         assert_equal(@settings.hostname, @simple.name)
     end
+
+    def test_txt
+        assert_equal("Simple Service", @simple.first.txt)
+    end
     
     def test_subtype_formatting
         assert_equal("_simple,_complex", @simple.first.subtype_display)
@@ -55,5 +59,18 @@ class TestAvahiService < Test::Unit::TestCase
         assert_equal(2, d.size)
         assert_equal(1, (d.find_all { |c| c.name == "Terminal Service"}).count)
         assert_equal(1, (d.find_all { |c| c.name == @settings.hostname}).count)
+    end
+
+    def test_in_zone
+        @settings.clear
+        @settings.load_from_yaml(File.join($DATA_BASE, "config.yaml"))
+        assert_equal("_ssh._tcp.browse.test.example.com", @ssh.first.type_in_zone)
+    end
+
+    def test_target
+        @settings.clear
+        @settings.load_from_yaml(File.join($DATA_BASE, "config.yaml"))
+        assert_equal("test.browse.test.example.com", @ssh.first.target)
+        assert_equal("localhost.localdomain", @simple.first.target)
     end
 end

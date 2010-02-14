@@ -23,11 +23,67 @@
 #
 # == Usage
 #
-# wamupd
+# wamupd service-file
+#
+# -c FILE, --config FILE:
+#   Get configuration data from FILE
+# -h, --help:
+#   Show this help
 
 # Update the include path
 $:.push(File.dirname(__FILE__))
 
-require 'avahi_service'
+require "avahi_service"
+require "dns_avahi_controller"
+
+require "getoptlong"
+require "rdoc/usage"
+
+config_file=nil
+bools = {
+    :publish=>false,
+    :unpublish=>false
+}
+
+opts = GetoptLong.new(
+    ["--help", "-h", GetoptLong::NO_ARGUMENT],
+    ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
+    ["--publish", "-p", GetoptLong::NO_ARGUMENT],
+    ["--unpublish", "-u", GetoptLong::NO_ARGUMENT]
+)
+
+boolean_vars = {
+    "--publish" => :publish,
+    "--unpublish" => :unpublish
+}
+
+opts.each do |opt,arg|
+    case opt
+    when "--help"
+        RDoc::usage
+    when "--config"
+        config_file = arg.to_s
+    end
+    if (boolean_vars.has_key?(opt))
+        bools[boolean_vars[opt]] = true
+    end
+end
+
+if (ARGV.length != 1)
+    puts "Incorrect arguments"
+    RDoc::usage
+end
 
 $settings = MainSettings.instance()
+if (not config_file.nil?)
+    $settings.load_from_yaml(config_file)
+end
+
+s = AvahiService.new(ARGV.shift.to_s)
+d = DNSAvahiController.new([s])
+if (bools[:publish])
+    d.publish_all
+end
+if (bools[:unpublish])
+    d.unpublish_all
+end

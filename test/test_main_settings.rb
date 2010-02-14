@@ -26,6 +26,7 @@ class TestMainSettings < Test::Unit::TestCase
         sa.clear
         hostname = Socket.gethostname
         assert_equal(hostname, sa.hostname)
+        assert_equal(86400, sa.ttl)
     end
 
     def test_yaml
@@ -37,7 +38,6 @@ class TestMainSettings < Test::Unit::TestCase
         assert_equal("test.example.com", sa.dns_server)
         assert_equal("test.example.com", sa.dnssec_key_name)
         assert_equal("qvdra/qmRNop12eD/1Ez4Dr==", sa.dnssec_key_value)
-
-
+        assert_equal(8640, sa.ttl)
     end
 end
