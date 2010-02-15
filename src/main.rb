@@ -25,6 +25,9 @@
 #
 # wamupd service-file
 #
+# -A DIRECTORY, --avahi-services DIRECTORY
+#   Load Avahi service definitions from DIRECTORY
+#   If DIRECTORY is not provided, defaults to /etc/avahi/services
 # -c FILE, --config FILE:
 #   Get configuration data from FILE
 # -h, --help:
@@ -40,21 +43,25 @@ require "getoptlong"
 require "rdoc/usage"
 
 config_file=nil
+avahi_dir="/etc/avahi/services/"
 bools = {
     :publish=>false,
-    :unpublish=>false
+    :unpublish=>false,
+    :avahi=>false
 }
 
 opts = GetoptLong.new(
     ["--help", "-h", GetoptLong::NO_ARGUMENT],
     ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
     ["--publish", "-p", GetoptLong::NO_ARGUMENT],
-    ["--unpublish", "-u", GetoptLong::NO_ARGUMENT]
+    ["--unpublish", "-u", GetoptLong::NO_ARGUMENT],
+    ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT]
 )
 
 boolean_vars = {
     "--publish" => :publish,
-    "--unpublish" => :unpublish
+    "--unpublish" => :unpublish,
+    "--avahi-services" => :avahi
 }
 
 opts.each do |opt,arg|
@@ -63,6 +70,10 @@ opts.each do |opt,arg|
         RDoc::usage
     when "--config"
         config_file = arg.to_s
+    when "--avahi-services"
+        if (not arg.nil? and arg != "")
+            avahi_dir=arg
+        end
     end
     if (boolean_vars.has_key?(opt))
         bools[boolean_vars[opt]] = true
@@ -79,11 +90,13 @@ if (not config_file.nil?)
     $settings.load_from_yaml(config_file)
 end
 
-s = AvahiService.new(ARGV.shift.to_s)
-d = DNSAvahiController.new([s])
-if (bools[:publish])
-    d.publish_all
-end
-if (bools[:unpublish])
-    d.unpublish_all
+if (bools[:avahi])
+    s = AvahiService.load_from_directory(avahi_dir)
+    d = DNSAvahiController.new(s)
+    if (bools[:publish])
+        d.publish_all
+    end
+    if (bools[:unpublish])
+        d.unpublish_all
+    end
 end
