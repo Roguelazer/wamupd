@@ -21,7 +21,6 @@ require "dns_ip_controller"
 
 class TestDNSAvahiController < Test::Unit::TestCase
     def test_1
-        ip = LocalIP.new()
-        dc = DNSIpController.new(ip)
+        dc = DNSIpController.new()
     end
 end

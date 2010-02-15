@@ -53,6 +53,12 @@ class MainSettings
     # Default weight of SRV records
     attr_reader :weight
 
+    # Current IPv4 address
+    attr_reader :ipv4
+
+    # Current IPv6 address
+    attr_reader :ipv6
+
     # Constructor. Use the instance() function
     # to actually initialize
     def initialize
@@ -62,6 +68,8 @@ class MainSettings
         @priority = 1
         @weight = 5
         @resolver = nil
+        @ipv4 = nil
+        @ipv6 = nil
     end
 
     # Are we using DNSSEC?
@@ -129,6 +137,34 @@ class MainSettings
             :dnssec => true
         })
         
+    end
+
+    # Get IPv4 and IPv6 addresses
+    def get_ip_addresses
+        sa = MainSettings.instance
+        begin
+            s = UDPSocket.new(Socket::AF_INET)
+            s.connect("8.8.8.8", 1)
+            if (s.addr[0] == "AF_INET")
+                @ipv4 = IPAddr.new(s.addr.last)
+            end
+        rescue SocketError => e
+            $stderr.puts "Unable to determine IPv4 address: #{e}"
+        rescue Errno::ENETUNREACH => e
+            $stderr.puts "Unable to determine IPv4 address: #{e}"
+        end
+
+        begin
+            s = UDPSocket.new(Socket::AF_INET6)
+            s.connect("2001:4860:b006::1", 1)
+            if (s.addr[0] == "AF_INET6")
+                @ipv6 = IPAddr.new(s.addr.last)
+            end
+        rescue SocketError => e
+            $stderr.puts "Unable to determine IPv6 address: #{e}"
+        rescue Errno::ENETUNREACH
+            $stderr.puts "Unable to determine IPv6 address: #{e}"
+        end
     end
 
     private :make_resolver
