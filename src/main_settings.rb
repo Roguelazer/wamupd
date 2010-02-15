@@ -64,7 +64,7 @@ class MainSettings
     def initialize
         @hostname = Socket.gethostname()
         @dns_port = 53
-        @ttl = 86400
+        @ttl = 7200
         @priority = 1
         @weight = 5
         @resolver = nil
@@ -134,7 +134,7 @@ class MainSettings
             :nameserver => self.dns_server,
             :port => self.dns_port,
             :tsig => ts,
-            :dnssec => true
+            :dnssec => false
         })
         
     end
@@ -153,10 +153,11 @@ class MainSettings
         rescue Errno::ENETUNREACH => e
             $stderr.puts "Unable to determine IPv4 address: #{e}"
         end
+        return
 
         begin
             s = UDPSocket.new(Socket::AF_INET6)
-            s.connect("2001:4860:b006::1", 1)
+            s.connect("2001:4860:b006::42", 1)
             if (s.addr[0] == "AF_INET6")
                 @ipv6 = IPAddr.new(s.addr.last)
             end

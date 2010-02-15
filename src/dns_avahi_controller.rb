@@ -29,22 +29,38 @@ class DNSAvahiController
         @sa = MainSettings.instance
         @services = services
         @resolver = @sa.resolver
+        @added = []
     end
 
     def publish_all
         update = Dnsruby::Update.new(@sa.zone, "IN")
         @services.each { |service|
             service.each { |service_entry|
+                update.absent(service_entry.type_in_zone_with_name,
+                              Dnsruby::Types.SRV)
                 update.add(service_entry.type_in_zone,
                            Dnsruby::Types.PTR, @sa.ttl,
                            service_entry.type_in_zone_with_name)
                 update.add(service_entry.type_in_zone_with_name,
                            Dnsruby::Types.SRV, @sa.ttl,
                            "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
+                update.add(service_entry.type_in_zone_with_name,
+                           Dnsruby::Types.TXT, @sa.ttl,
+                           service_entry.txt)
             }
         }
+        opt = Dnsruby::RR::OPT.new()
+        lease_time = Dnsruby::RR::OPT::Option.new(2, [@sa.ttl].pack("N"))
+        opt.klass="IN"
+        opt.options=[lease_time]
+        opt.ttl = 0
+        opt.payloadsize=1440
+        update.add_additional(opt)
+        update.header.rd=false
         begin
             @resolver.send_message(update)
+        rescue Dnsruby::YXRRSet => e
+            $stderr.puts "Not adding records because they already exist: #{e}"
         rescue Exception => e
             $stderr.puts "Registration failed: #{e}"
         end
@@ -54,17 +70,21 @@ class DNSAvahiController
         update = Dnsruby::Update.new(@sa.zone, "IN")
         @services.each { |service|
             service.each { |service_entry|
-                update.present(service_entry.type_in_zone, Dnsruby::Types.SRV)
+                update.present(service_entry.type_in_zone_with_name,
+                               Dnsruby::Types.SRV)
                 update.delete(service_entry.type_in_zone_with_name,
-                              Dnsruby::Types.SRV,
-                              "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
+                              Dnsruby::Types.SRV)
                 update.delete(service_entry.type_in_zone,
                               Dnsruby::Types.PTR,
                               service_entry.type_in_zone_with_name)
+                update.delete(service_entry.type_in_zone_with_name,
+                              Dnsruby::Types.TXT)
             }
         }
         begin
             @resolver.send_message(update)
+        rescue Dnsruby::NXRRSet => e
+            $stderr.puts "Not adding records because they don't already exist: #{e}"
         rescue Exception => e
             $stderr.puts "Deletion failed: #{e}"
         end

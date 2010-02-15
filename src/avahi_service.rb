@@ -34,7 +34,6 @@ class AvahiService
         attr_reader :subtype
         attr_reader :hostname
         attr_reader :port
-        attr_reader :txt
         attr_reader :domainname
 
         # Get the subtype as Apple displays it
@@ -66,6 +65,11 @@ class AvahiService
             else
                 t += @domainname
             end
+        end
+
+        # TXT record
+        def txt
+            return @txt.nil? ? "nt" : @txt
         end
 
         # Initialize from an XML node

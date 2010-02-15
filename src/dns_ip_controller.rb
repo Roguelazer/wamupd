@@ -34,20 +34,36 @@ class DNSIpController
     def publish
         update = Dnsruby::Update.new(@sa.zone, "IN")
         if (@sa.ipv4)
-            update.absent(@sa.target, Dnsruby::Types.A)
+            #update.absent(@sa.target, Dnsruby::Types.A)
             update.add(@sa.target, Dnsruby::Types.A, @sa.ttl, @sa.ipv4)
+            opt = Dnsruby::RR::OPT.new()
+            lease_time = Dnsruby::RR::OPT::Option.new(2, [@sa.ttl].pack("N"))
+            opt.klass="IN"
+            opt.options=[lease_time]
+            opt.ttl = 0
+            opt.payloadsize=1440
+            update.add_additional(opt)
+            update.header.rd=false
             begin
                 @resolver.send_message(update)
             rescue Dnsruby::YXRRSet => e
                 $stderr.puts "Not adding IPv4 address because it already exists!"
             rescue Exception => e
-                $stderr.puts "Registration failed: #{e}"
+                $stderr.puts "Registration failed: #{e.to_s}"
             end
         end
+        return
         update = Dnsruby::Update.new(@sa.zone, "IN")
         if (@sa.ipv6)
             update.absent(@sa.target, Dnsruby::Types.AAAA)
             update.add(@sa.target, Dnsruby::Types.AAAA, @sa.ttl, @sa.ipv6)
+            opt = Dnsruby::RR::OPT.new()
+            lease_time = Dnsruby::RR::OPT::Option.new(2, "1600")
+            opt.klass="IN"
+            opt.options=[lease_time]
+            opt.ttl = 0
+            update.add(opt)
+            puts update
             begin
                 @resolver.send_message(update)
             rescue Dnsruby::YXRRSet => e

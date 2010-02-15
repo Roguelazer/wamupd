@@ -55,7 +55,7 @@ bools = {
     :publish=>false,
     :unpublish=>false,
     :avahi=>false,
-    :ip=>true
+    :ip=>false
 }
 
 opts = GetoptLong.new(
@@ -99,8 +99,7 @@ if (not config_file.nil?)
 end
 
 if (bools[:ip])
-    ip = LocalIP.new
-    d = DNSIpController.new(ip)
+    d = DNSIpController.new()
     if (bools[:publish])
         d.publish
     end
