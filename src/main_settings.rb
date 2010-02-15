@@ -64,8 +64,18 @@ class MainSettings
         @resolver = nil
     end
 
+    # Are we using DNSSEC?
     def using_dnssec?
         return (not @dnssec_key_name.nil?)
+    end
+
+    # Target for ops
+    def target
+        t = ""
+        t += @hostname
+        t += "."
+        t += @zone
+        return t
     end
 
     # Load some more settings from a YAML file
