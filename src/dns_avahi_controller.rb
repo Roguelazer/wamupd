@@ -35,9 +35,12 @@ class DNSAvahiController
         update = Dnsruby::Update.new(@sa.zone, "IN")
         @services.each { |service|
             service.each { |service_entry|
-                puts update.add(service_entry.type_in_zone,
-                                Dnsruby::Types.SRV, @sa.ttl,
-                                "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
+                update.add(service_entry.type_in_zone,
+                           Dnsruby::Types.PTR, @sa.ttl,
+                           service_entry.type_in_zone_with_name)
+                update.add(service_entry.type_in_zone_with_name,
+                           Dnsruby::Types.SRV, @sa.ttl,
+                           "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
             }
         }
         begin
@@ -51,9 +54,12 @@ class DNSAvahiController
         update = Dnsruby::Update.new(@sa.zone, "IN")
         @services.each { |service|
             service.each { |service_entry|
-                puts update.delete(service_entry.type_in_zone,
-                                Dnsruby::Types.SRV,
-                                "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
+                update.delete(service_entry.type_in_zone_with_name,
+                              Dnsruby::Types.SRV,
+                              "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
+                update.delete(service_entry.type_in_zone,
+                              Dnsruby::Types.PTR,
+                              service_entry.type_in_zone_with_name)
             }
         }
         begin

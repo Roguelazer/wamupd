@@ -42,6 +42,11 @@ class AvahiService
             "#{@type},#{@subtype}"
         end
 
+        def type_in_zone_with_name
+            sa = MainSettings.instance
+            return sa.hostname + "." + @type + "."+ sa.zone
+        end
+
         def type_in_zone
             sa = MainSettings.instance
             return @type + "." + sa.zone
