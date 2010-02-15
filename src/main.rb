@@ -30,14 +30,21 @@
 #   If DIRECTORY is not provided, defaults to /etc/avahi/services
 # -c FILE, --config FILE:
 #   Get configuration data from FILE
+# -i, --ip-addreses (or --no-ip-addresses)
+#   Enable/Disable Publishing A and AAAA records
 # -h, --help:
 #   Show this help
+# -p, --publish
+#   Publish records
+# -u, --unpublish
+#   Unpublish records
 
 # Update the include path
 $:.push(File.dirname(__FILE__))
 
 require "avahi_service"
 require "dns_avahi_controller"
+require "dns_ip_controller"
 
 require "getoptlong"
 require "rdoc/usage"
@@ -47,7 +54,8 @@ avahi_dir="/etc/avahi/services/"
 bools = {
     :publish=>false,
     :unpublish=>false,
-    :avahi=>false
+    :avahi=>false,
+    :ip=>true
 }
 
 opts = GetoptLong.new(
@@ -55,13 +63,16 @@ opts = GetoptLong.new(
     ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
     ["--publish", "-p", GetoptLong::NO_ARGUMENT],
     ["--unpublish", "-u", GetoptLong::NO_ARGUMENT],
-    ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT]
+    ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT],
+    ["--ip-addresses", "-i", GetoptLong::NO_ARGUMENT],
+    ["--no-ip-addresses", GetoptLong::NO_ARGUMENT]
 )
 
 boolean_vars = {
     "--publish" => :publish,
     "--unpublish" => :unpublish,
-    "--avahi-services" => :avahi
+    "--avahi-services" => :avahi,
+    "--ip-addresses" => :ip
 }
 
 opts.each do |opt,arg|
@@ -74,20 +85,28 @@ opts.each do |opt,arg|
         if (not arg.nil? and arg != "")
             avahi_dir=arg
         end
+    when "--no-ip-addresses"
+        bools[:ip] = false
     end
     if (boolean_vars.has_key?(opt))
         bools[boolean_vars[opt]] = true
     end
 end
 
-if (ARGV.length != 1)
-    puts "Incorrect arguments"
-    RDoc::usage
-end
-
 $settings = MainSettings.instance()
 if (not config_file.nil?)
     $settings.load_from_yaml(config_file)
+end
+
+if (bools[:ip])
+    ip = LocalIP.new
+    d = DNSIpController.new(ip)
+    if (bools[:publish])
+        d.publish
+    end
+    if (bools[:unpublish])
+        d.unpublish
+    end
 end
 
 if (bools[:avahi])
@@ -100,3 +119,4 @@ if (bools[:avahi])
         d.unpublish_all
     end
 end
+

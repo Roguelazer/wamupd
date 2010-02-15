@@ -46,7 +46,7 @@ class DNSAvahiController
         begin
             @resolver.send_message(update)
         rescue Exception => e
-            puts "Registration failed: #{e}"
+            $stderr.puts "Registration failed: #{e}"
         end
     end
 
@@ -54,6 +54,7 @@ class DNSAvahiController
         update = Dnsruby::Update.new(@sa.zone, "IN")
         @services.each { |service|
             service.each { |service_entry|
+                update.present(service_entry.type_in_zone, Dnsruby::Types.SRV)
                 update.delete(service_entry.type_in_zone_with_name,
                               Dnsruby::Types.SRV,
                               "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
@@ -65,7 +66,7 @@ class DNSAvahiController
         begin
             @resolver.send_message(update)
         rescue Exception => e
-            puts "Deletion failed: #{e}"
+            $stderr.puts "Deletion failed: #{e}"
         end
     end
 end
