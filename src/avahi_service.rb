@@ -69,7 +69,7 @@ class AvahiService
 
         # TXT record
         def txt
-            return @txt.nil? ? "nt" : @txt
+            return @txt.nil? ? "\0" : @txt
         end
 
         # Initialize from an XML node

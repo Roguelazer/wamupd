@@ -26,7 +26,7 @@ class TestMainSettings < Test::Unit::TestCase
         sa.clear
         hostname = Socket.gethostname
         assert_equal(hostname, sa.hostname)
-        assert_equal(86400, sa.ttl)
+        assert_equal(7200, sa.ttl)
     end
 
     def test_yaml

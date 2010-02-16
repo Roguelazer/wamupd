@@ -49,7 +49,7 @@ require "dns_ip_controller"
 require "getoptlong"
 require "rdoc/usage"
 
-config_file=nil
+config_file="/etc/wamupd.yaml"
 avahi_dir="/etc/avahi/services/"
 bools = {
     :publish=>false,
@@ -95,6 +95,11 @@ end
 
 $settings = MainSettings.instance()
 if (not config_file.nil?)
+    if (not File.exists?(config_file))
+        $stderr.puts "Could not find configuration file #{config_file}"
+        $stderr.puts "Try running with --help?"
+        exit
+    end
     $settings.load_from_yaml(config_file)
 end
 
@@ -119,3 +124,7 @@ if (bools[:avahi])
     end
 end
 
+if (not (bools[:avahi] or bools[:ip]))
+    $stderr.puts "No action specified!"
+    $stderr.puts "Try running with --help (or adding a -i or -A)"
+end
