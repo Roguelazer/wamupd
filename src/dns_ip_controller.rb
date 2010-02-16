@@ -30,75 +30,29 @@ class DNSIpController
         @resolver = @sa.resolver
     end
 
+    def do_publish(target, type, ttl, value)
+    end
+
+    def do_unpublish(target, type, ttl, value)
+    end
+
     # Publish A and AAAA records
     def publish
-        update = Dnsruby::Update.new(@sa.zone, "IN")
         if (@sa.ipv4)
-            #update.absent(@sa.target, Dnsruby::Types.A)
-            update.add(@sa.target, Dnsruby::Types.A, @sa.ttl, @sa.ipv4)
-            opt = Dnsruby::RR::OPT.new()
-            lease_time = Dnsruby::RR::OPT::Option.new(2, [@sa.ttl].pack("N"))
-            opt.klass="IN"
-            opt.options=[lease_time]
-            opt.ttl = 0
-            opt.payloadsize=1440
-            update.add_additional(opt)
-            update.header.rd=false
-            begin
-                @resolver.send_message(update)
-            rescue Dnsruby::YXRRSet => e
-                $stderr.puts "Not adding IPv4 address because it already exists!"
-            rescue Exception => e
-                $stderr.puts "Registration failed: #{e.to_s}"
-            end
+            DnsUpdate.publish(@sa.target, Dnsruby::Types.A, @sa.ttl, @sa.ipv4)
         end
-        return
-        update = Dnsruby::Update.new(@sa.zone, "IN")
         if (@sa.ipv6)
-            update.absent(@sa.target, Dnsruby::Types.AAAA)
-            update.add(@sa.target, Dnsruby::Types.AAAA, @sa.ttl, @sa.ipv6)
-            opt = Dnsruby::RR::OPT.new()
-            lease_time = Dnsruby::RR::OPT::Option.new(2, "1600")
-            opt.klass="IN"
-            opt.options=[lease_time]
-            opt.ttl = 0
-            update.add(opt)
-            puts update
-            begin
-                @resolver.send_message(update)
-            rescue Dnsruby::YXRRSet => e
-                $stderr.puts "Not adding IPv6 address because it already exists!"
-            rescue Exception => e
-                $stderr.puts "Registration failed: #{e}"
-            end
+            DnsUpdate.publish(@sa.target, Dnsruby::Types.AAAA, @sa.ttl, @sa.ipv6)
         end
     end
 
     # Unpublish A and AAAA records
     def unpublish
-        update = Dnsruby::Update.new(@sa.zone, "IN")
         if (@sa.ipv4)
-            update.present(@sa.target, Dnsruby::Types.A)
-            update.delete(@sa.target, Dnsruby::Types.A, @sa.ipv4)
-            begin
-                @resolver.send_message(update)
-            rescue Dnsruby::NXRRSet => e
-                $stderr.puts "Not removing IPv4 address because it doesn't exist! (#{e})"
-            rescue Exception => e
-                $stderr.puts "Registration failed: #{e}"
-            end
+            DnsUpdate.unpublish(@sa.target, Dnsruby::Types.A, @sa.ipv4)
         end
-        update = Dnsruby::Update.new(@sa.zone, "IN")
         if (@sa.ipv6)
-            update.present(@sa.target, Dnsruby::Types.AAAA)
-            update.delete(@sa.target, Dnsruby::Types.AAAA, @sa.ipv6)
-            begin
-                @resolver.send_message(update)
-            rescue Dnsruby::NXRRSet => e
-                $stderr.puts "Not removing IPv6 address because it doesn't exist! (#{e})"
-            rescue Exception => e
-                $stderr.puts "Registration failed: #{e}"
-            end
+            DnsUpdate.unpublish(@sa.target, Dnsruby::Types.AAAA, @sa.ipv6)
         end
     end
 end

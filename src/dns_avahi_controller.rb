@@ -19,6 +19,7 @@
 require "avahi_service"
 require "main_settings"
 require "dnsruby"
+require "dns_update"
 
 # Coordinate between a set of Avahi Services and DNS records
 class DNSAvahiController
@@ -33,60 +34,33 @@ class DNSAvahiController
     end
 
     def publish_all
-        update = Dnsruby::Update.new(@sa.zone, "IN")
+        to_update = []
         @services.each { |service|
             service.each { |service_entry|
-                update.absent(service_entry.type_in_zone_with_name,
-                              Dnsruby::Types.SRV)
-                update.add(service_entry.type_in_zone,
-                           Dnsruby::Types.PTR, @sa.ttl,
-                           service_entry.type_in_zone_with_name)
-                update.add(service_entry.type_in_zone_with_name,
-                           Dnsruby::Types.SRV, @sa.ttl,
-                           "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}")
-                update.add(service_entry.type_in_zone_with_name,
-                           Dnsruby::Types.TXT, @sa.ttl,
-                           service_entry.txt)
+                to_update << {:target=>service_entry.type_in_zone,
+                    :type=>Dnsruby::Types.PTR, :ttl=>@sa.ttl,
+                    :value=>service_entry.type_in_zone_with_name}
+                to_update << {:target=>service_entry.type_in_zone_with_name,
+                    :type=>Dnsruby::Types.SRV, :ttl=>@sa.ttl,
+                    :value=> "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}"}
+                to_update << {:target => service_entry.type_in_zone_with_name,
+                    :type=>Dnsruby::Types.TXT, :ttl=>@sa.ttl,
+                    :value=>service_entry.txt}
             }
         }
-        opt = Dnsruby::RR::OPT.new()
-        lease_time = Dnsruby::RR::OPT::Option.new(2, [@sa.ttl].pack("N"))
-        opt.klass="IN"
-        opt.options=[lease_time]
-        opt.ttl = 0
-        opt.payloadsize=1440
-        update.add_additional(opt)
-        update.header.rd=false
-        begin
-            @resolver.send_message(update)
-        rescue Dnsruby::YXRRSet => e
-            $stderr.puts "Not adding records because they already exist: #{e}"
-        rescue Exception => e
-            $stderr.puts "Registration failed: #{e}"
-        end
+        DnsUpdate.publish_all(to_update)
     end
 
     def unpublish_all
-        update = Dnsruby::Update.new(@sa.zone, "IN")
+        todo = []
         @services.each { |service|
             service.each { |service_entry|
-                update.present(service_entry.type_in_zone_with_name,
-                               Dnsruby::Types.SRV)
-                update.delete(service_entry.type_in_zone_with_name,
-                              Dnsruby::Types.SRV)
-                update.delete(service_entry.type_in_zone,
-                              Dnsruby::Types.PTR,
-                              service_entry.type_in_zone_with_name)
-                update.delete(service_entry.type_in_zone_with_name,
-                              Dnsruby::Types.TXT)
+                todo << [service_entry.type_in_zone_with_name, Dnsruby::Types.SRV]
+                todo << [service_entry.type_in_zone, Dnsruby, Dnsruby::Types.PTR,
+                    service_entry.type_in_zone_with_name]
+                todo << [service_entry.type_in_zone_with_name, Dnsruby::Types.TXT]
             }
         }
-        begin
-            @resolver.send_message(update)
-        rescue Dnsruby::NXRRSet => e
-            $stderr.puts "Not adding records because they don't already exist: #{e}"
-        rescue Exception => e
-            $stderr.puts "Deletion failed: #{e}"
-        end
+        DnsUpdate.unpublish_all(todo)
     end
 end
