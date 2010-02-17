@@ -73,4 +73,29 @@ class TestAvahiService < Test::Unit::TestCase
         assert_equal("test.browse.test.example.com", @ssh.first.target)
         assert_equal("localhost.localdomain", @simple.first.target)
     end
+
+    def test_hash_construct
+        a = AvahiService::AvahiServiceEntry.new({
+            :type=>"t",
+            :subtype=>"s",
+            :hostname=>"h",
+            :domainname=>"d",
+            :port=>10,
+            :txt=>"txt"
+        })
+        assert_equal("t", a.type)
+        assert_equal("s", a.subtype)
+        assert_equal("h", a.hostname)
+        assert_equal("d", a.domainname)
+        assert_equal(10, a.port)
+        assert_equal("txt", a.txt)
+
+        a = AvahiService::AvahiServiceEntry.new({})
+        assert_nil(a.type)
+        assert_nil(a.subtype)
+        assert_nil(a.hostname)
+        assert_nil(a.domainname)
+        assert_nil(a.port)
+        assert_equal("\0", a.txt)
+    end
 end

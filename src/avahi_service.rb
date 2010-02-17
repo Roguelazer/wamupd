@@ -72,24 +72,45 @@ class AvahiService
             return @txt.nil? ? "\0" : @txt
         end
 
-        # Initialize from an XML node
-        def initialize(node)
-            node.children.each { |c|
-                case c.name
-                when "type"
-                    @type = c.content
-                when "subtype"
-                    @subtype = c.content
-                when "host-name"
-                    @hostname = c.content
-                when "port"
-                    @port = c.content.to_i
-                when "txt-record"
-                    @txt = c.content
-                when "domain-name"
-                    @domainname = c.content
-                end
-            }
+        # Initialize
+        #
+        # Argument:
+        # Either an XML node or a hash with some useful subset of the
+        # parameters :type, :subtype, :hostname, :port, :txt, and
+        # :domainname
+        def initialize(param)
+            if (param.kind_of?(LibXML::XML::Node))
+                node = param
+                node.children.each { |c|
+                    case c.name
+                    when "type"
+                        @type = c.content
+                    when "subtype"
+                        @subtype = c.content
+                    when "host-name"
+                        @hostname = c.content
+                    when "port"
+                        @port = c.content.to_i
+                    when "txt-record"
+                        @txt = c.content
+                    when "domain-name"
+                        @domainname = c.content
+                    end
+                }
+            elsif (param.kind_of?(Hash))
+                mapping = {:type=>:@type,
+                    :subtype=>:@subtype,
+                    :hostname=>:@hostname,
+                    :port=>:@port,
+                    :txt=>:@txt,
+                    :domainname=>:@domainname
+                }
+                mapping.each {|k,v|
+                    if (param.has_key?(k))
+                        self.instance_variable_set(v, param[k])
+                    end
+                }
+            end
         end
     end
 

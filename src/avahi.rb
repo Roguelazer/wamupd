@@ -18,6 +18,7 @@
 
 require "dbus"
 require "set"
+require "avahi_service"
 
 class AvahiModel
     def initialize
