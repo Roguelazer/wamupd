@@ -103,14 +103,18 @@ class AvahiModel
                         end
                     end
                 elsif (item_msg.member == "ItemRemove")
-                    puts "Removing item #{item_msg.params[2]}"
+                    if ((item_msg.params[5] & 8) != 0)
+                        puts "Removing item #{item_msg.params[2]}"
+                    end
                 end
             end
         }
     end
 
     def add_service_record(name, type, host, port, txt)
-        puts "Name=#{name}, Type=#{type}, Host=#{host}, Port=#{port}, Txt=#{txt}"
+        host.sub!(/\.local$/, "")
+        a = AvahiService.new(name, {:type=>type, :hostname=>host, :port=>port, :txt=>txt})
+        puts a
     end
 
     def main

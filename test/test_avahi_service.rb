@@ -23,8 +23,8 @@ require 'avahi_service'
 class TestAvahiService < Test::Unit::TestCase
     def setup
         @settings = MainSettings.instance()
-        @ssh = AvahiService.new(File.join($DATA_BASE, "ssh.service"))
-        @simple = AvahiService.new(File.join($DATA_BASE, "simple.service"))
+        @ssh = AvahiService.new_from_file(File.join($DATA_BASE, "ssh.service"))
+        @simple = AvahiService.new_from_file(File.join($DATA_BASE, "simple.service"))
     end
 
     def test_ssh
@@ -97,5 +97,15 @@ class TestAvahiService < Test::Unit::TestCase
         assert_nil(a.domainname)
         assert_nil(a.port)
         assert_equal("\0", a.txt)
+    end
+
+    def test_main_construct
+        a = AvahiService.new("test")
+        assert_equal("test", a.name)
+        assert_equal(0, a.size)
+
+        a = AvahiService.new("test", {})
+        assert_equal("test", a.name)
+        assert_equal(1, a.size)
     end
 end

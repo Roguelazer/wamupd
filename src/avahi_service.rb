@@ -150,9 +150,40 @@ class AvahiService
     end
 
     # Initialize the service from a service file
-    def initialize(filename)
+    def initialize(name=nil, params=nil)
         @valid = false
         @services = []
+        
+        if (not name.nil?)
+            @name = name
+        end
+
+        if (not params.nil?)
+            if (params.kind_of?(Array))
+                params.each { |param|
+                    @services << AvahiServiceEntry.new(param)
+                }
+            elsif (params.kind_of?(Hash))
+                @services << AvahiServiceEntry.new(params)
+            end
+        end
+    end
+
+    # Construct a new AvahiService entry from a .service definition
+    #
+    # Arguments:
+    # filename:: The file to load
+    def self.new_from_file(filename)
+        a = AvahiService.new
+        a.load_from_file(filename)
+        return a
+    end
+
+    # Load this AvahiService entry from a .service defintion file
+    #
+    # Arguments:
+    # filename:: The file to load
+    def load_from_file(filename)
         d = XML::Document.file(filename)
         if (not File.exists?($service_dtd_path))
             $stderr.puts "Could not find service DTD at #{$service_dtd_path}"
@@ -163,7 +194,7 @@ class AvahiService
         }
         validator = XML::Dtd.new(dtd)
         @valid = d.validate(validator)
-        if (not valid)
+        if (not @valid)
             $stderr.puts "Service file #{filename} failed validation"
             exit(1)
         end
@@ -188,8 +219,13 @@ class AvahiService
     def self.load_from_directory(dir)
         retval = []
         Dir.glob(File.join(dir, "*.service")).each { |f|
-            retval.push(AvahiService.new(f))
+            retval.push(AvahiService.new_from_file(f))
         }
         return retval
+    end
+
+    # String coercer
+    def to_s
+        "<AvahiService name='#{@name}' containing #{self.size} records>"
     end
 end
