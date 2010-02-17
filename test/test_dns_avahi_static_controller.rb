@@ -18,11 +18,11 @@
 
 require "test/unit"
 require "avahi_service"
-require "dns_avahi_controller"
+require "dns_avahi_static_controller"
 
-class TestDNSAvahiController < Test::Unit::TestCase
+class TestDNSAvahiStaticController < Test::Unit::TestCase
     def test_1
         avahis = AvahiService.load_from_directory($DATA_BASE)
-        dc = DNSAvahiController.new(avahis)
+        dc = DNSAvahiStaticController.new(avahis)
     end
 end

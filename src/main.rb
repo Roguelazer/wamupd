@@ -43,7 +43,7 @@
 $:.push(File.dirname(__FILE__))
 
 require "avahi_service"
-require "dns_avahi_controller"
+require "dns_avahi_static_controller"
 require "dns_ip_controller"
 
 require "getoptlong"
@@ -115,7 +115,7 @@ end
 
 if (bools[:avahi])
     s = AvahiService.load_from_directory(avahi_dir)
-    d = DNSAvahiController.new(s)
+    d = DNSAvahiStaticController.new(s)
     if (bools[:publish])
         d.publish_all
     end

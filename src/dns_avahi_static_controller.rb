@@ -22,7 +22,7 @@ require "dnsruby"
 require "dns_update"
 
 # Coordinate between a set of Avahi Services and DNS records
-class DNSAvahiController
+class DNSAvahiStaticController
     attr_reader :resolver
 
     # Initialize the controller. Takes an array of services
