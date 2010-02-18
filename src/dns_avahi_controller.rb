@@ -25,12 +25,30 @@ require "dns_update"
 class DNSAvahiStaticController
     attr_reader :resolver
 
-    # Initialize the controller. Takes an array of services
-    def initialize(services)
+    # Initialize the controller.
+    def initialize()
         @sa = MainSettings.instance
-        @services = services
+        @services = []
         @resolver = @sa.resolver
         @added = []
+    end
+
+    # Add an array of services to the controller
+    def add_services(services)
+        services.each { |s| add_service(s) }
+    end
+
+    # Add a single service record to the controller
+    def add_service(service)
+        if (not service.kind_of?(AvahiService))
+            raise ArgumentError.new("Not an AvahiService")
+        end
+        @services << service
+    end
+
+    # Return the number of elements in the controller
+    def size
+        return @services.size
     end
 
     def publish_all

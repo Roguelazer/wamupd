@@ -226,6 +226,12 @@ class AvahiService
 
     # String coercer
     def to_s
-        "<AvahiService name='#{@name}' containing #{self.size} records>"
+        s =  "<AvahiService name='#{@name}' containing #{self.size} records\n"
+        self.each { |as|
+        s += " type=#{as.type}\n"
+        s += " txt=#{as.txt}\n"
+        }
+        s += ">"
+        return s
     end
 end

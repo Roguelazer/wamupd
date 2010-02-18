@@ -33,6 +33,8 @@ class AvahiModel
         @count = 0
 
         @known_services = Hash.new
+
+        @pending_questions = 0
     end
 
     def start_listen
@@ -88,17 +90,27 @@ class AvahiModel
                             mrs.type = "signal"
                             mrs.interface = "org.freedesktop.Avahi.ServiceResolver"
                             mrs.path = srb.first
+                            @pending_questions+=1
                             @bus.add_match(mrs) do |msg,fp|
                                 if (msg.member == "Found")
-                                    name = item_msg.params[2]
+                                    name = msg.params[2]
                                     type = msg.params[3]
                                     host = msg.params[5]
                                     address = msg.params[7]
                                     port = msg.params[8]
-                                    txt = msg.params[9]
+                                    val = ""
+                                    msg.params[9].each { |c|
+                                        val += c.pack("c*")
+                                        val += " "
+                                    }
+                                    txt = val
                                     add_service_record(name, type, host, port, txt)
                                 end
-                                @count -= 1
+                                @pending_questions -= 1
+                                puts "Number of pending questions: #{@pending_questions}"
+                                if (@pending_questions <= 0)
+                                    @main_loop.quit
+                                end
                             end
                         end
                     end
@@ -112,15 +124,17 @@ class AvahiModel
     end
 
     def add_service_record(name, type, host, port, txt)
+        # Replace the .local that Avahi sticks at the end of the host (why
+        # doesn't it just use the domain field? who knows?)
         host.sub!(/\.local$/, "")
         a = AvahiService.new(name, {:type=>type, :hostname=>host, :port=>port, :txt=>txt})
         puts a
     end
 
     def main
-        main = DBus::Main.new
-        main << @bus
-        main.run
+        @main_loop = DBus::Main.new
+        @main_loop << @bus
+        @main_loop.run
     end
 end
 

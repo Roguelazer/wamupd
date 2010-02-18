@@ -43,22 +43,17 @@
 $:.push(File.dirname(__FILE__))
 
 require "avahi_service"
-require "dns_avahi_static_controller"
+require "dns_avahi_controller"
 require "dns_ip_controller"
 
 require "getoptlong"
 require "rdoc/usage"
+require "singleton"
 
-config_file="/etc/wamupd.yaml"
-avahi_dir="/etc/avahi/services/"
-bools = {
-    :publish=>false,
-    :unpublish=>false,
-    :avahi=>false,
-    :ip=>false
-}
+DEFAULT_CONFIG_FILE = "/etc/wamupd.yaml"
+DEFAULT_AVAHI_DIR   = "/etc/avahi/services/"
 
-opts = GetoptLong.new(
+OPTS = GetoptLong.new(
     ["--help", "-h", GetoptLong::NO_ARGUMENT],
     ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
     ["--publish", "-p", GetoptLong::NO_ARGUMENT],
@@ -68,63 +63,117 @@ opts = GetoptLong.new(
     ["--no-ip-addresses", GetoptLong::NO_ARGUMENT]
 )
 
-boolean_vars = {
-    "--publish" => :publish,
-    "--unpublish" => :unpublish,
-    "--avahi-services" => :avahi,
-    "--ip-addresses" => :ip
-}
+# Main wamupd object
+module Wamupd
 
-opts.each do |opt,arg|
-    case opt
-    when "--help"
-        RDoc::usage
-    when "--config"
-        config_file = arg.to_s
-    when "--avahi-services"
-        if (not arg.nil? and arg != "")
-            avahi_dir=arg
+    class Main
+        include Singleton
+
+        # Process command-line objects
+        def process_args
+            @config_file = DEFAULT_CONFIG_FILE
+            @avahi_dir = DEFAULT_AVAHI_DIR
+
+            boolean_vars = {
+                "--publish" => :publish,
+                "--unpublish" => :unpublish,
+                "--avahi-services" => :avahi,
+                "--ip-addresses" => :ip
+            }
+
+            OPTS.each do |opt,arg|
+                case opt
+                when "--help"
+                    RDoc::usage
+                when "--config"
+                    @config_file = arg.to_s
+                when "--avahi-services"
+                    if (not arg.nil? and arg != "")
+                        @avahi_dir=arg
+                    end
+                when "--no-ip-addresses"
+                    @bools[:ip] = false
+                end
+                if (boolean_vars.has_key?(opt))
+                    @bools[boolean_vars[opt]] = true
+                end
+            end
         end
-    when "--no-ip-addresses"
-        bools[:ip] = false
-    end
-    if (boolean_vars.has_key?(opt))
-        bools[boolean_vars[opt]] = true
+
+        # Construct the object and process all command-line options
+        def initialize
+            @bools = {
+                :publish=>false,
+                :unpublish=>false,
+                :avahi=>false,
+                :ip=>false
+            }
+
+            $settings = MainSettings.instance()
+
+            process_args()
+
+            # Load settings
+            if (not File.exists?(@config_file))
+                $stderr.puts "Could not find configuration file #{@config_file}"
+                $stderr.puts "Try running with --help?"
+                exit
+            end
+            $settings.load_from_yaml(@config_file)
+
+            if (not (@bools[:avahi] or @bools[:ip]))
+                $stderr.puts "No action specified!"
+                $stderr.puts "Try running with --help (or adding a -i or -A)"
+                exit
+            end
+
+            if (@bools[:ip])
+                @d = DNSIpController.new()
+            end
+
+            if (@bools[:avahi])
+                @avahi_services = AvahiService.load_from_directory(@avahi_dir)
+                @a = DNSAvahiController.new()
+                @a.add_services(@avahi_services)
+            end
+        end
+
+        def main
+            if (@bools[:publish])
+                publish_static
+            end
+            
+            if (@bools[:unpublish])
+                unpublish_static
+            end
+        end
+
+        def publish_static
+            if (@d)
+                @d.publish
+            end
+
+            if (@a)
+                @a.publish_all
+            end
+        end
+        
+        def unpublish_static
+            if (@d)
+                @d.unpublish
+            end
+
+            if (@a)
+                @a.unpublish_all
+            end
+        end
+
+        private :process_args
     end
 end
 
-$settings = MainSettings.instance()
-if (not config_file.nil?)
-    if (not File.exists?(config_file))
-        $stderr.puts "Could not find configuration file #{config_file}"
-        $stderr.puts "Try running with --help?"
-        exit
-    end
-    $settings.load_from_yaml(config_file)
-end
 
-if (bools[:ip])
-    d = DNSIpController.new()
-    if (bools[:publish])
-        d.publish
-    end
-    if (bools[:unpublish])
-        d.unpublish
-    end
-end
-
-if (bools[:avahi])
-    s = AvahiService.load_from_directory(avahi_dir)
-    d = DNSAvahiStaticController.new(s)
-    if (bools[:publish])
-        d.publish_all
-    end
-    if (bools[:unpublish])
-        d.unpublish_all
-    end
-end
-
-if (not (bools[:avahi] or bools[:ip]))
-    $stderr.puts "No action specified!"
-    $stderr.puts "Try running with --help (or adding a -i or -A)"
+if (__FILE__ == $0)
+    w = Wamupd::Main.instance
+    w.main
 end
