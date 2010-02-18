@@ -50,21 +50,21 @@ require "getoptlong"
 require "rdoc/usage"
 require "singleton"
 
-DEFAULT_CONFIG_FILE = "/etc/wamupd.yaml"
-DEFAULT_AVAHI_DIR   = "/etc/avahi/services/"
-
-OPTS = GetoptLong.new(
-    ["--help", "-h", GetoptLong::NO_ARGUMENT],
-    ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
-    ["--publish", "-p", GetoptLong::NO_ARGUMENT],
-    ["--unpublish", "-u", GetoptLong::NO_ARGUMENT],
-    ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT],
-    ["--ip-addresses", "-i", GetoptLong::NO_ARGUMENT],
-    ["--no-ip-addresses", GetoptLong::NO_ARGUMENT]
-)
-
 # Main wamupd object
 module Wamupd
+
+    OPTS = GetoptLong.new(
+        ["--help", "-h", GetoptLong::NO_ARGUMENT],
+        ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
+        ["--publish", "-p", GetoptLong::NO_ARGUMENT],
+        ["--unpublish", "-u", GetoptLong::NO_ARGUMENT],
+        ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT],
+        ["--ip-addresses", "-i", GetoptLong::NO_ARGUMENT],
+        ["--no-ip-addresses", GetoptLong::NO_ARGUMENT]
+    )
+
+    DEFAULT_CONFIG_FILE = "/etc/wamupd.yaml"
+    DEFAULT_AVAHI_DIR   = "/etc/avahi/services/"
 
     class Main
         include Singleton

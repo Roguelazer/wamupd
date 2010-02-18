@@ -22,7 +22,7 @@ require "socket"
 
 class TestMainSettings < Test::Unit::TestCase
     def test_main
-        sa = MainSettings.instance()
+        sa = Wamupd::MainSettings.instance()
         sa.clear
         hostname = Socket.gethostname
         assert_equal(hostname, sa.hostname)
@@ -30,7 +30,7 @@ class TestMainSettings < Test::Unit::TestCase
     end
 
     def test_yaml
-        sa = MainSettings.instance()
+        sa = Wamupd::MainSettings.instance()
         sa.clear
         sa.load_from_yaml(File.join($DATA_BASE, "config.yaml"))
         assert_equal("test", sa.hostname)

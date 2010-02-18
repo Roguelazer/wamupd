@@ -20,152 +20,154 @@ require "singleton"
 require "socket"
 require "yaml"
 
-# Simple singleton for storing app-side configuration-type
-# things
-class MainSettings
-    include Singleton
+module Wamupd
+    # Simple singleton for storing app-side configuration-type
+    # things
+    class MainSettings
+        include Singleton
 
-    # The current hostname, or, if present, the 
-    # host name desired from the YAML
-    attr_reader :hostname
+        # The current hostname, or, if present, the 
+        # host name desired from the YAML
+        attr_reader :hostname
 
-    # DNS server to try and update
-    attr_reader :dns_server
+        # DNS server to try and update
+        attr_reader :dns_server
 
-    # Port to use when talking to the DNS server
-    attr_reader :dns_port
+        # Port to use when talking to the DNS server
+        attr_reader :dns_port
 
-    # DNSSEC key name (if nil, do not use DNSSEC)
-    attr_reader :dnssec_key_name
+        # DNSSEC key name (if nil, do not use DNSSEC)
+        attr_reader :dnssec_key_name
 
-    # DNSSEC key value (usually, a HMAC-MD5 private key)
-    attr_reader :dnssec_key_value
+        # DNSSEC key value (usually, a HMAC-MD5 private key)
+        attr_reader :dnssec_key_value
 
-    # Zone
-    attr_reader :zone
+        # Zone
+        attr_reader :zone
 
-    # Default TTL of records
-    attr_reader :ttl
+        # Default TTL of records
+        attr_reader :ttl
 
-    # Default priority of SRV records
-    attr_reader :priority
+        # Default priority of SRV records
+        attr_reader :priority
 
-    # Default weight of SRV records
-    attr_reader :weight
+        # Default weight of SRV records
+        attr_reader :weight
 
-    # Current IPv4 address
-    attr_reader :ipv4
+        # Current IPv4 address
+        attr_reader :ipv4
 
-    # Current IPv6 address
-    attr_reader :ipv6
+        # Current IPv6 address
+        attr_reader :ipv6
 
-    # Constructor. Use the instance() function
-    # to actually initialize
-    def initialize
-        @hostname = Socket.gethostname()
-        @dns_port = 53
-        @ttl = 7200
-        @priority = 1
-        @weight = 5
-        @resolver = nil
-        @ipv4 = nil
-        @ipv6 = nil
-    end
-
-    # Are we using DNSSEC?
-    def using_dnssec?
-        return (not @dnssec_key_name.nil?)
-    end
-
-    # Target for ops
-    def target
-        t = ""
-        t += @hostname
-        t += "."
-        t += @zone
-        return t
-    end
-
-    # Load some more settings from a YAML file
-    def load_from_yaml(yaml_file)
-        y = YAML.load_file(yaml_file)
-        properties_map = { 
-            "hostname" => :@hostname,
-            "dns_server" => :@dns_server,
-            "dns_port" => :@dns_port,
-            "dnssec_key_name" => :@dnssec_key_name,
-            "dnssec_key_hmac" => :@dnssec_key_value,
-            "zone" => :@zone,
-            "ttl" => :@ttl,
-            "srv_priority" => :@priority,
-            "srv_weight" => :@weight
-        }
-        properties_map.each { |k,v|
-            if (y.has_key?(k))
-                self.instance_variable_set(v, y[k])
-            end
-        }
-    end
-
-    # Reset the MainSettings
-    def clear
-        initialize
-    end
-
-    # Get a Dnsruby::Resolver
-    def resolver
-        if (@resolver.nil?)
-            make_resolver
+        # Constructor. Use the instance() function
+        # to actually initialize
+        def initialize
+            @hostname = Socket.gethostname()
+            @dns_port = 53
+            @ttl = 7200
+            @priority = 1
+            @weight = 5
+            @resolver = nil
+            @ipv4 = nil
+            @ipv6 = nil
         end
-        return @resolver
-    end
 
-    def make_resolver
-        if self.using_dnssec?
-            ts = Dnsruby::RR.new_from_hash({
-                :type=>Dnsruby::Types.TSIG,
-                :klass=>Dnsruby::Classes.ANY,
-                :name=>self.dnssec_key_name,
-                :key=>self.dnssec_key_value,
-                :algorithm=>Dnsruby::RR::TSIG::HMAC_MD5
+        # Are we using DNSSEC?
+        def using_dnssec?
+            return (not @dnssec_key_name.nil?)
+        end
+
+        # Target for ops
+        def target
+            t = ""
+            t += @hostname
+            t += "."
+            t += @zone
+            return t
+        end
+
+        # Load some more settings from a YAML file
+        def load_from_yaml(yaml_file)
+            y = YAML.load_file(yaml_file)
+            properties_map = { 
+                "hostname" => :@hostname,
+                "dns_server" => :@dns_server,
+                "dns_port" => :@dns_port,
+                "dnssec_key_name" => :@dnssec_key_name,
+                "dnssec_key_hmac" => :@dnssec_key_value,
+                "zone" => :@zone,
+                "ttl" => :@ttl,
+                "srv_priority" => :@priority,
+                "srv_weight" => :@weight
+            }
+            properties_map.each { |k,v|
+                if (y.has_key?(k))
+                    self.instance_variable_set(v, y[k])
+                end
+            }
+        end
+
+        # Reset the MainSettings
+        def clear
+            initialize
+        end
+
+        # Get a Dnsruby::Resolver
+        def resolver
+            if (@resolver.nil?)
+                make_resolver
+            end
+            return @resolver
+        end
+
+        def make_resolver
+            if self.using_dnssec?
+                ts = Dnsruby::RR.new_from_hash({
+                    :type=>Dnsruby::Types.TSIG,
+                    :klass=>Dnsruby::Classes.ANY,
+                    :name=>self.dnssec_key_name,
+                    :key=>self.dnssec_key_value,
+                    :algorithm=>Dnsruby::RR::TSIG::HMAC_MD5
+                })
+            end
+            @resolver = Dnsruby::Resolver.new({
+                :nameserver => self.dns_server,
+                :port => self.dns_port,
+                :tsig => ts,
+                :dnssec => false
             })
+            
         end
-        @resolver = Dnsruby::Resolver.new({
-            :nameserver => self.dns_server,
-            :port => self.dns_port,
-            :tsig => ts,
-            :dnssec => false
-        })
-        
-    end
 
-    # Get IPv4 and IPv6 addresses
-    def get_ip_addresses
-        sa = MainSettings.instance
-        begin
-            s = UDPSocket.new(Socket::AF_INET)
-            s.connect("8.8.8.8", 1)
-            if (s.addr[0] == "AF_INET")
-                @ipv4 = IPAddr.new(s.addr.last)
+        # Get IPv4 and IPv6 addresses
+        def get_ip_addresses
+            sa = MainSettings.instance
+            begin
+                s = UDPSocket.new(Socket::AF_INET)
+                s.connect("8.8.8.8", 1)
+                if (s.addr[0] == "AF_INET")
+                    @ipv4 = IPAddr.new(s.addr.last)
+                end
+            rescue SocketError => e
+                $stderr.puts "Unable to determine IPv4 address: #{e}"
+            rescue Errno::ENETUNREACH => e
+                $stderr.puts "Unable to determine IPv4 address: #{e}"
             end
-        rescue SocketError => e
-            $stderr.puts "Unable to determine IPv4 address: #{e}"
-        rescue Errno::ENETUNREACH => e
-            $stderr.puts "Unable to determine IPv4 address: #{e}"
-        end
 
-        begin
-            s = UDPSocket.new(Socket::AF_INET6)
-            s.connect("2001:4860:b006::2", 1)
-            if (s.addr[0] == "AF_INET6")
-                @ipv6 = IPAddr.new(s.addr.last)
+            begin
+                s = UDPSocket.new(Socket::AF_INET6)
+                s.connect("2001:4860:b006::2", 1)
+                if (s.addr[0] == "AF_INET6")
+                    @ipv6 = IPAddr.new(s.addr.last)
+                end
+            rescue SocketError => e
+                $stderr.puts "Unable to determine IPv6 address: #{e}"
+            rescue Errno::ENETUNREACH
+                $stderr.puts "Unable to determine IPv6 address: #{e}"
             end
-        rescue SocketError => e
-            $stderr.puts "Unable to determine IPv6 address: #{e}"
-        rescue Errno::ENETUNREACH
-            $stderr.puts "Unable to determine IPv6 address: #{e}"
         end
-    end
 
-    private :make_resolver
+        private :make_resolver
+    end
 end

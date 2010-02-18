@@ -21,64 +21,66 @@ require "main_settings"
 require "dnsruby"
 require "dns_update"
 
-# Coordinate between a set of Avahi Services and DNS records
-class DNSAvahiStaticController
-    attr_reader :resolver
+module Wamupd
+    # Coordinate between a set of Avahi Services and DNS records
+    class DNSAvahiStaticController
+        attr_reader :resolver
 
-    # Initialize the controller.
-    def initialize()
-        @sa = MainSettings.instance
-        @services = []
-        @resolver = @sa.resolver
-        @added = []
-    end
-
-    # Add an array of services to the controller
-    def add_services(services)
-        services.each { |s| add_service(s) }
-    end
-
-    # Add a single service record to the controller
-    def add_service(service)
-        if (not service.kind_of?(AvahiService))
-            raise ArgumentError.new("Not an AvahiService")
+        # Initialize the controller.
+        def initialize()
+            @sa = MainSettings.instance
+            @services = []
+            @resolver = @sa.resolver
+            @added = []
         end
-        @services << service
-    end
 
-    # Return the number of elements in the controller
-    def size
-        return @services.size
-    end
+        # Add an array of services to the controller
+        def add_services(services)
+            services.each { |s| add_service(s) }
+        end
 
-    def publish_all
-        to_update = []
-        @services.each { |service|
-            service.each { |service_entry|
-                to_update << {:target=>service_entry.type_in_zone,
-                    :type=>Dnsruby::Types.PTR, :ttl=>@sa.ttl,
-                    :value=>service_entry.type_in_zone_with_name}
-                to_update << {:target=>service_entry.type_in_zone_with_name,
-                    :type=>Dnsruby::Types.SRV, :ttl=>@sa.ttl,
-                    :value=> "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}"}
-                to_update << {:target => service_entry.type_in_zone_with_name,
-                    :type=>Dnsruby::Types.TXT, :ttl=>@sa.ttl,
-                    :value=>service_entry.txt}
+        # Add a single service record to the controller
+        def add_service(service)
+            if (not service.kind_of?(AvahiService))
+                raise ArgumentError.new("Not an AvahiService")
+            end
+            @services << service
+        end
+
+        # Return the number of elements in the controller
+        def size
+            return @services.size
+        end
+
+        def publish_all
+            to_update = []
+            @services.each { |service|
+                service.each { |service_entry|
+                    to_update << {:target=>service_entry.type_in_zone,
+                        :type=>Dnsruby::Types.PTR, :ttl=>@sa.ttl,
+                        :value=>service_entry.type_in_zone_with_name}
+                    to_update << {:target=>service_entry.type_in_zone_with_name,
+                        :type=>Dnsruby::Types.SRV, :ttl=>@sa.ttl,
+                        :value=> "#{@sa.priority} #{@sa.weight} #{service_entry.port} #{service_entry.target}"}
+                    to_update << {:target => service_entry.type_in_zone_with_name,
+                        :type=>Dnsruby::Types.TXT, :ttl=>@sa.ttl,
+                        :value=>service_entry.txt}
+                }
             }
-        }
-        DnsUpdate.publish_all(to_update)
-    end
+            DnsUpdate.publish_all(to_update)
+        end
 
-    def unpublish_all
-        todo = []
-        @services.each { |service|
-            service.each { |service_entry|
-                todo << [service_entry.type_in_zone_with_name, Dnsruby::Types.SRV]
-                todo << [service_entry.type_in_zone, Dnsruby, Dnsruby::Types.PTR,
-                    service_entry.type_in_zone_with_name]
-                todo << [service_entry.type_in_zone_with_name, Dnsruby::Types.TXT]
+        def unpublish_all
+            todo = []
+            @services.each { |service|
+                service.each { |service_entry|
+                    todo << [service_entry.type_in_zone_with_name, Dnsruby::Types.SRV]
+                    todo << [service_entry.type_in_zone, Dnsruby, Dnsruby::Types.PTR,
+                        service_entry.type_in_zone_with_name]
+                    todo << [service_entry.type_in_zone_with_name, Dnsruby::Types.TXT]
+                }
             }
-        }
-        DnsUpdate.unpublish_all(todo)
+            DnsUpdate.unpublish_all(todo)
+        end
     end
 end

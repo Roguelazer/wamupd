@@ -20,11 +20,11 @@ require 'test/unit'
 require 'main_settings'
 require 'avahi_service'
 
-class TestAvahiService < Test::Unit::TestCase
+class Test::AvahiService < Test::Unit::TestCase
     def setup
-        @settings = MainSettings.instance()
-        @ssh = AvahiService.new_from_file(File.join($DATA_BASE, "ssh.service"))
-        @simple = AvahiService.new_from_file(File.join($DATA_BASE, "simple.service"))
+        @settings = Wamupd::MainSettings.instance()
+        @ssh = Wamupd::AvahiService.new_from_file(File.join($DATA_BASE, "ssh.service"))
+        @simple = Wamupd::AvahiService.new_from_file(File.join($DATA_BASE, "simple.service"))
     end
 
     def test_ssh
@@ -55,7 +55,7 @@ class TestAvahiService < Test::Unit::TestCase
     end
 
     def test_dir
-        d = AvahiService.load_from_directory($DATA_BASE)
+        d = Wamupd::AvahiService.load_from_directory($DATA_BASE)
         assert_equal(2, d.size)
         assert_equal(1, (d.find_all { |c| c.name == "Terminal Service"}).count)
         assert_equal(1, (d.find_all { |c| c.name == @settings.hostname}).count)
@@ -75,7 +75,7 @@ class TestAvahiService < Test::Unit::TestCase
     end
 
     def test_hash_construct
-        a = AvahiService::AvahiServiceEntry.new({
+        a = Wamupd::AvahiService::AvahiServiceEntry.new({
             :type=>"t",
             :subtype=>"s",
             :hostname=>"h",
@@ -90,7 +90,7 @@ class TestAvahiService < Test::Unit::TestCase
         assert_equal(10, a.port)
         assert_equal("txt", a.txt)
 
-        a = AvahiService::AvahiServiceEntry.new({})
+        a = Wamupd::AvahiService::AvahiServiceEntry.new({})
         assert_nil(a.type)
         assert_nil(a.subtype)
         assert_nil(a.hostname)
@@ -100,11 +100,11 @@ class TestAvahiService < Test::Unit::TestCase
     end
 
     def test_main_construct
-        a = AvahiService.new("test")
+        a = Wamupd::AvahiService.new("test")
         assert_equal("test", a.name)
         assert_equal(0, a.size)
 
-        a = AvahiService.new("test", {})
+        a = Wamupd::AvahiService.new("test", {})
         assert_equal("test", a.name)
         assert_equal(1, a.size)
     end

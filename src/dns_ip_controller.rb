@@ -21,38 +21,44 @@ require "dnsruby"
 require "socket"
 require "ipaddr"
 
-# Manage IP information in DNS
-class DNSIpController
-    # Constructor
-    def initialize()
-        @sa = MainSettings.instance
-        @sa.get_ip_addresses
-        @resolver = @sa.resolver
-    end
-
-    def do_publish(target, type, ttl, value)
-    end
-
-    def do_unpublish(target, type, ttl, value)
-    end
-
-    # Publish A and AAAA records
-    def publish
-        if (@sa.ipv4)
-            DnsUpdate.publish(@sa.target, Dnsruby::Types.A, @sa.ttl, @sa.ipv4)
+module Wamupd
+    # Manage IP information in DNS
+    class DNSIpController
+        # Constructor
+        def initialize()
+            @sa = MainSettings.instance
+            @sa.get_ip_addresses
+            @resolver = @sa.resolver
         end
-        if (@sa.ipv6)
-            DnsUpdate.publish(@sa.target, Dnsruby::Types.AAAA, @sa.ttl, @sa.ipv6)
-        end
-    end
 
-    # Unpublish A and AAAA records
-    def unpublish
-        if (@sa.ipv4)
-            DnsUpdate.unpublish(@sa.target, Dnsruby::Types.A, @sa.ipv4)
+        # Publish A and AAAA records
+        def publish
+            if (@sa.ipv4)
+                DnsUpdate.publish(@sa.target, Dnsruby::Types.A, @sa.ttl, @sa.ipv4)
+            end
+            if (@sa.ipv6)
+                DnsUpdate.publish(@sa.target, Dnsruby::Types.AAAA, @sa.ttl, @sa.ipv6)
+            end
         end
-        if (@sa.ipv6)
-            DnsUpdate.unpublish(@sa.target, Dnsruby::Types.AAAA, @sa.ipv6)
+
+        # Synonym for publish
+        def publish_all
+            publish
+        end
+
+        # Unpublish A and AAAA records
+        def unpublish
+            if (@sa.ipv4)
+                DnsUpdate.unpublish(@sa.target, Dnsruby::Types.A, @sa.ipv4)
+            end
+            if (@sa.ipv6)
+                DnsUpdate.unpublish(@sa.target, Dnsruby::Types.AAAA, @sa.ipv6)
+            end
+        end
+
+        # Synonym for unpublish
+        def unpublish_all
+            unpublish
         end
     end
 end
