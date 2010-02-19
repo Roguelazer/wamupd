@@ -163,7 +163,7 @@ module Wamupd
                 end
             rescue SocketError => e
                 $stderr.puts "Unable to determine IPv6 address: #{e}"
-            rescue Errno::ENETUNREACH
+            rescue Errno::ENETUNREACH => e
                 $stderr.puts "Unable to determine IPv6 address: #{e}"
             end
         end
