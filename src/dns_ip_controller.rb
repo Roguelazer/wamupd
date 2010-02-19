@@ -33,10 +33,10 @@ module Wamupd
         # Publish A and AAAA records
         def publish
             if (@sa.ipv4)
-                DnsUpdate.publish(@sa.target, Dnsruby::Types.A, @sa.ttl, @sa.ipv4)
+                DNSUpdate.publish(@sa.target, Dnsruby::Types.A, @sa.ttl, @sa.ipv4)
             end
             if (@sa.ipv6)
-                DnsUpdate.publish(@sa.target, Dnsruby::Types.AAAA, @sa.ttl, @sa.ipv6)
+                DNSUpdate.publish(@sa.target, Dnsruby::Types.AAAA, @sa.ttl, @sa.ipv6)
             end
         end
 
@@ -48,10 +48,10 @@ module Wamupd
         # Unpublish A and AAAA records
         def unpublish
             if (@sa.ipv4)
-                DnsUpdate.unpublish(@sa.target, Dnsruby::Types.A, @sa.ipv4)
+                DNSUpdate.unpublish(@sa.target, Dnsruby::Types.A, @sa.ipv4)
             end
             if (@sa.ipv6)
-                DnsUpdate.unpublish(@sa.target, Dnsruby::Types.AAAA, @sa.ipv6)
+                DNSUpdate.unpublish(@sa.target, Dnsruby::Types.AAAA, @sa.ipv6)
             end
         end
 

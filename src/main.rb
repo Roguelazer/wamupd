@@ -43,6 +43,7 @@
 $:.push(File.dirname(__FILE__))
 
 require "avahi_service"
+require "avahi_service_file"
 require "dns_avahi_controller"
 require "dns_ip_controller"
 
@@ -50,7 +51,7 @@ require "getoptlong"
 require "rdoc/usage"
 require "singleton"
 
-# Main wamupd object
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
 
     OPTS = GetoptLong.new(
@@ -66,6 +67,7 @@ module Wamupd
     DEFAULT_CONFIG_FILE = "/etc/wamupd.yaml"
     DEFAULT_AVAHI_DIR   = "/etc/avahi/services/"
 
+    # Main wamupd object
     class Main
         include Singleton
 
@@ -132,8 +134,8 @@ module Wamupd
             end
 
             if (@bools[:avahi])
-                @avahi_services = AvahiService.load_from_directory(@avahi_dir)
-                @a = DNSAvahiController.new()
+                @avahi_services = AvahiServiceFile.load_from_directory(@avahi_dir)
+                @a = Wamupd::DNSAvahiController.new()
                 @a.add_services(@avahi_services)
             end
         end
