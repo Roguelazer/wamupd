@@ -137,7 +137,6 @@ module Wamupd
             if (@bools[:avahi])
                 @avahi_services = AvahiServiceFile.load_from_directory(@avahi_dir)
                 @a = Wamupd::DNSAvahiController.new()
-                @a.add_services(@avahi_services)
 
                 @am = Wamupd::AvahiModel.new
             end
@@ -148,34 +147,56 @@ module Wamupd
             # Publish/unpublish static records
             if (@bools[:publish])
                 publish_static
+                return
             end
             if (@bools[:unpublish])
                 unpublish_static
+                return
             end
 
+            update_queue = Queue.new
+            DNSUpdate.queue = update_queue
+
             threads = []
-            # Handle the DNS controller
-            threads << Thread.new {
-                @a.on(:quit) {
-                    Thread.exit
+            if (@bools[:avahi])
+                # Handle the DNS controller
+                threads << Thread.new {
+                    @a.on(:quit) {
+                        Thread.exit
+                    }
+                    @a.on(:added) { |item|
+                        puts "Added #{item.type_in_zone_with_name}"
+                    }
+                    @a.on(:deleted) { |item|
+                        puts "Deleted #{item.type_in_zone_with_name}"
+                    }
+                    @a.run
                 }
-                @a.on(:added) { |record|
-                    puts "Got a record through the Queue"
+                @am.on(:added) { |avahi_service|
+                    @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
                 }
-                @a.run
-            }
-            @am.on(:added) { |avahi_service|
-                puts "Found a new service with D-BUS"
-                puts avahi_service
-                @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
-            }
-            # Handle listening to D-BUS
-            threads << Thread.new {
-                @am.run
-            }
+                # Handle listening to D-BUS
+                threads << Thread.new {
+                    @am.run
+                }
+            end
 
             trap(2) {
-                puts "Quitting"
+                puts "Unregistering services, please wait..."
+                if (@bools[:avahi])
+                    @am.exit
+                    @a.exit
+                end
+                @d.unpublish
+                Thread.new {
+                    while (DNSUpdate.outstanding.count > 0)
+                        response_id, response, exception = update_queue.pop
+                        if DNSUpdate.outstanding.delete(response_id).nil?
+                            $stderr.puts "Got back an unexpected response"
+                            $stderr.puts response
+                        end
+                    end
+                }.join
                 threads.each { |t|
                     t.exit
                 }
@@ -192,7 +213,9 @@ module Wamupd
             end
 
             if (@a)
-                @a.publish_all
+                @avahi_services.each { |avahi_service|
+                    @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
+                }
             end
         end
         

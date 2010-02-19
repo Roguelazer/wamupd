@@ -62,8 +62,17 @@ module Wamupd
                 end
             elsif (service.kind_of?(AvahiServiceFile))
                 service.each { |service_entry|
-                    self.add_service(service_entry)
+                    add_service(service_entry)
                 }
+            else
+                raise ArgumentError.new("Not an AvahiService")
+            end
+        end
+
+        # Delete a signle service record from the service
+        def delete_service(service)
+            if service.kind_of?(AvahiService)
+                @services.delete(service.identifier)
             else
                 raise ArgumentError.new("Not an AvahiService")
             end
@@ -100,11 +109,44 @@ module Wamupd
         def unpublish_all
             todo = []
             @services.each { |key,service|
-                todo << [service.type_in_zone_with_name, Dnsruby::Types.SRV]
-                todo << [service.type_in_zone, Dnsruby, Dnsruby::Types.PTR,
-                    service.type_in_zone_with_name]
-                todo << [service.type_in_zone_with_name, Dnsruby::Types.TXT]
+                todo << { :target=>service.type_in_zone_with_name, 
+                    :type=>Dnsruby::Types.SRV,
+                    :value=> "#{@sa.priority} #{@sa.weight} #{service.port} #{service.target}"}
+                todo << { :target=>service.type_in_zone, 
+                    :type=>Dnsruby::Types.PTR,
+                    :value=>service.type_in_zone_with_name}
+                todo << { :target=>service.type_in_zone_with_name,
+                    :type=>Dnsruby::Types.TXT,
+                    :value=>service.txt}
             }
+            DNSUpdate.unpublish_all(*todo)
+        end
+
+        # Publish a single service
+        def publish(service, ttl=@sa.ttl)
+            to_update = []
+            to_update << {:target=>service.type_in_zone,
+                :type=>Dnsruby::Types.PTR, :ttl=>ttl,
+                :value=>service.type_in_zone_with_name}
+            to_update << {:target=>service.type_in_zone_with_name,
+                :type=>Dnsruby::Types.SRV, :ttl=>ttl,
+                :value=> "#{@sa.priority} #{@sa.weight} #{service.port} #{service.target}"}
+            to_update << {:target => service.type_in_zone_with_name,
+                :type=>Dnsruby::Types.TXT, :ttl=>ttl,
+                :value=>service.txt}
+            DNSUpdate.publish_all(to_update)
+        end
+
+        # Unpublish a single service
+        def unpublish(service, ttl=@sa.ttl)
+            todo = []
+            to_update << {:target=>service.type_in_zone,
+                :type=>Dnsruby::Types.PTR,
+                :value=>service.type_in_zone_with_name}
+            to_update << {:target=>service.type_in_zone_with_name, 
+                :type=>DnsRuby::Types.SRV}
+            to_update << {:target=>service.type_in_zone_with_name,
+                :type=>Dnsruby::Types.TXT}
             DNSUpdate.unpublish_all(todo)
         end
 
@@ -112,16 +154,30 @@ module Wamupd
         def process_action(action)
             case action.action
             when Wamupd::ActionType::ADD
-                signal(:added, action.record)
+                begin
+                    add_service(action.record)
+                    publish(action.record, 30)
+                    signal(:added, action.record)
+                rescue DuplicateServiceError
+                    # Do nothing
+                end
             when Wamupd::ActionType::DELETE
+                delete_service(action.record)
+                unpublish_service(action.record)
                 signal(:deleted, action.record)
             when Wamupd::ActionType::QUIT
                 # Flush the queue, then signal quit
                 until @queue.empty?
                     process_action(@queue.pop(false))
                 end
+                unpublish_all
                 signal(:quit)
             end
+        end
+
+        # Exit out of the main loop
+        def exit
+            @queue << Wamupd::Action.new(Wamupd::ActionType::QUIT)
         end
 
         # Wait for data to go into the queue, and handle it when it does
@@ -131,6 +187,6 @@ module Wamupd
             end
         end
 
-        private :process_action
+        private :process_action, :publish
     end
 end

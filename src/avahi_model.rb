@@ -129,6 +129,10 @@ module Wamupd
             signal(:added, a)
         end
 
+        def exit
+            signal(:quit)
+        end
+
         def run
             start_listen
 

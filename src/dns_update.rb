@@ -22,6 +22,24 @@ module Wamupd
     # Class to help with constructing DNS UPDATEs. Probably not useful except to
     # me.
     class DNSUpdate
+        @@queue = nil
+        @@outstanding = []
+
+        # Set the queue
+        def self.queue=(v)
+            @@queue=v
+        end
+
+        # How many requests are outstanding?
+        def self.outstanding
+            return @@outstanding
+        end
+
+        # Is this update going to be asynchronous?
+        def self.async?
+            return (not @@queue.nil?)
+        end
+    
         # Publish a batch of DNS records
         #
         # Arguments:
@@ -56,7 +74,13 @@ module Wamupd
             update.add_additional(opt)
             update.header.rd = false
             begin
-                resolver.send_message(update)
+#                if (async?)
+#                    puts "Sending asynchronous request"
+#                    resolver.send_async(update, @@queue)
+#                    @@outstanding += 1
+#                else
+                    resolver.send_message(update)
+#                end
             rescue Dnsruby::TsigNotSignedResponseError => e
                 # Not really an error for UPDATE; we don't care if the reply is
                 # signed!
@@ -94,7 +118,12 @@ module Wamupd
                 end
             }
             begin
-                resolver.send_message(update)
+                if (async?)
+                    queue_id = resolver.send_async(update, @@queue)
+                    @@outstanding << queue_id
+                else
+                    resolver.send_message(update)
+                end
             rescue Dnsruby::NXRRSet => e
                 $stderr.puts "Could not remove record because it doesn't exist!"
             rescue Dnsruby::TsigNotSignedResponseError => e
@@ -112,7 +141,7 @@ module Wamupd
         # Arguments:
         # Same as Dnsruby::Update::delete
         def self.unpublish(*args)
-            self.unpublish_all([args])
+            self.unpublish_all(args)
         end
     end
 end
