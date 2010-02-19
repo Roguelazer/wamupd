@@ -21,6 +21,10 @@ require "dns_ip_controller"
 
 class TestDNSAvahiController < Test::Unit::TestCase
     def test_1
-        dc = Wamupd::DNSIpController.new()
+        dc = nil
+        assert_nothing_raised {
+            dc = Wamupd::DNSIpController.new()
+        }
+        assert_not_nil(dc)
     end
 end

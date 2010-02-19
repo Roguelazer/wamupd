@@ -1,4 +1,3 @@
-#!/usr/bin/ruby
 # Copyright (C) 2009-2010 James Brown <roguelazer@roguelazer.com>.
 #
 # This file is part of wamupd.

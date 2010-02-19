@@ -21,61 +21,8 @@ require 'main_settings'
 require 'avahi_service'
 
 class Test::AvahiService < Test::Unit::TestCase
-    def setup
-        @settings = Wamupd::MainSettings.instance()
-        @ssh = Wamupd::AvahiService.new_from_file(File.join($DATA_BASE, "ssh.service"))
-        @simple = Wamupd::AvahiService.new_from_file(File.join($DATA_BASE, "simple.service"))
-    end
-
-    def test_ssh
-        assert(@ssh.valid)
-        assert_equal("Terminal Service", @ssh.name)
-        assert_equal(1, @ssh.count)
-        assert_equal(1, @ssh.size)
-        @ssh.each { |s|
-            assert_equal("_ssh._tcp", s.type)
-            assert_equal(22, s.port)
-            assert_nil(s.subtype)
-            assert_nil(s.hostname)
-            assert_equal("\0", s.txt)
-        }
-    end
-
-    def test_substution
-        assert(@simple.valid)
-        assert_equal(@settings.hostname, @simple.name)
-    end
-
-    def test_txt
-        assert_equal("Simple Service", @simple.first.txt)
-    end
-    
-    def test_subtype_formatting
-        assert_equal("_simple,_complex", @simple.first.subtype_display)
-    end
-
-    def test_dir
-        d = Wamupd::AvahiService.load_from_directory($DATA_BASE)
-        assert_equal(2, d.size)
-        assert_equal(1, (d.find_all { |c| c.name == "Terminal Service"}).count)
-        assert_equal(1, (d.find_all { |c| c.name == @settings.hostname}).count)
-    end
-
-    def test_in_zone
-        @settings.clear
-        @settings.load_from_yaml(File.join($DATA_BASE, "config.yaml"))
-        assert_equal("_ssh._tcp.browse.test.example.com", @ssh.first.type_in_zone)
-    end
-
-    def test_target
-        @settings.clear
-        @settings.load_from_yaml(File.join($DATA_BASE, "config.yaml"))
-        assert_equal("test.browse.test.example.com", @ssh.first.target)
-        assert_equal("localhost.localdomain", @simple.first.target)
-    end
-
     def test_hash_construct
-        a = Wamupd::AvahiService::AvahiServiceEntry.new({
+        a = Wamupd::AvahiService.new("test", {
             :type=>"t",
             :subtype=>"s",
             :hostname=>"h",
@@ -83,6 +30,7 @@ class Test::AvahiService < Test::Unit::TestCase
             :port=>10,
             :txt=>"txt"
         })
+        assert_equal("test", a.name)
         assert_equal("t", a.type)
         assert_equal("s", a.subtype)
         assert_equal("h", a.hostname)
@@ -90,22 +38,13 @@ class Test::AvahiService < Test::Unit::TestCase
         assert_equal(10, a.port)
         assert_equal("txt", a.txt)
 
-        a = Wamupd::AvahiService::AvahiServiceEntry.new({})
+        a = Wamupd::AvahiService.new("", {})
+        assert_equal("", a.name)
         assert_nil(a.type)
         assert_nil(a.subtype)
         assert_nil(a.hostname)
         assert_nil(a.domainname)
         assert_nil(a.port)
         assert_equal("\0", a.txt)
-    end
-
-    def test_main_construct
-        a = Wamupd::AvahiService.new("test")
-        assert_equal("test", a.name)
-        assert_equal(0, a.size)
-
-        a = Wamupd::AvahiService.new("test", {})
-        assert_equal("test", a.name)
-        assert_equal(1, a.size)
     end
 end

@@ -1,4 +1,3 @@
-#!/usr/bin/ruby
 # Copyright (C) 2009-2010 James Brown <roguelazer@roguelazer.com>.
 #
 # This file is part of wamupd.
@@ -24,12 +23,11 @@ require "dns_update"
 module Wamupd
     # Coordinate between a set of Avahi Services and DNS records
     class DNSAvahiStaticController
-        attr_reader :resolver
-
         # Initialize the controller.
         def initialize()
             @sa = MainSettings.instance
-            @services = []
+            # Services stored as a hash from 
+            @services = {}
             @resolver = @sa.resolver
             @added = []
         end
@@ -41,15 +39,25 @@ module Wamupd
 
         # Add a single service record to the controller
         def add_service(service)
-            if (not service.kind_of?(AvahiService))
+            if service.kind_of?(AvahiService)
+                @services[service.identifier] = service
+            elsif (service.kind_of?(AvahiServiceFile))
+                service.each { |service_entry|
+                    self.add_service(service_entry)
+                }
+            else
                 raise ArgumentError.new("Not an AvahiService")
             end
-            @services << service
         end
 
         # Return the number of elements in the controller
         def size
             return @services.size
+        end
+
+        # Keys
+        def keys
+            return @services.keys
         end
 
         def publish_all
