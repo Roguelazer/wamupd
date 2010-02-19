@@ -17,6 +17,7 @@
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
 require "test/unit"
+require "thread"
 require "avahi_service_file"
 require "dns_avahi_controller"
 
@@ -33,5 +34,64 @@ class TestDNSAvahiStaticController < Test::Unit::TestCase
         assert_not_nil(dc)
         assert_equal(1, dc.size)
         assert_equal("_ssh._tcp-22", dc.keys[0])
+    end
+
+    def test_parallel
+        d = Wamupd::DNSAvahiController.new()
+        i = 0
+        dt = Thread.new {
+            d.on(:added) {
+                i += 1
+            }
+            d.on(:quit) {
+                Thread.exit
+            }
+            d.run
+        }
+        ct = Thread.new {
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::QUIT))
+        }
+        dt.join
+        ct.join
+        assert_equal(1, i)
+    end
+
+    def test_parallel_2
+        d = Wamupd::DNSAvahiController.new()
+        i = 0
+        dt = Thread.new {
+            d.on(:added) {
+                i += 1
+            }
+            d.on(:quit) {
+                Thread.exit
+            }
+            d.run
+        }
+        ct = Thread.new {
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
+        }
+        c2t = Thread.new {
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::QUIT, ""))
+        }
+        dt.join
+        ct.join
+        c2t.join
+        assert_equal(6, i)
+    end
+
+    def test_raise
+        d = Wamupd::DNSAvahiController.new
+        service = Wamupd::AvahiServiceFile.new(File.join($DATA_BASE, "ssh.service"))
+        service2 = Wamupd::AvahiService.new("NOT SSH", {:type=>"_ssh._tcp", :port=>22})
+        assert_nothing_raised { d.add_service(service) }
+        assert_raise(Wamupd::DuplicateServiceError) { d.add_service(service) }
+        assert_raise(Wamupd::DuplicateServiceError) { d.add_service(service2) }
     end
 end

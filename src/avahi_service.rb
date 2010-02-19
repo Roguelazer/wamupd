@@ -14,6 +14,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
+#
+# == Signals
 
 require 'xml'
 
@@ -101,6 +103,11 @@ module Wamupd
                     self.instance_variable_set(v, param[k])
                 end
             }
+        end
+
+        # String coercer
+        def to_s
+            "<AvahiService name='#{@name}' type=#{@type} txt=#{self.txt}>"
         end
     end
 end

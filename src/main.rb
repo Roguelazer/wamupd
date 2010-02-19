@@ -42,6 +42,7 @@
 # Update the include path
 $:.push(File.dirname(__FILE__))
 
+require "avahi_model"
 require "avahi_service"
 require "avahi_service_file"
 require "dns_avahi_controller"
@@ -137,17 +138,52 @@ module Wamupd
                 @avahi_services = AvahiServiceFile.load_from_directory(@avahi_dir)
                 @a = Wamupd::DNSAvahiController.new()
                 @a.add_services(@avahi_services)
+
+                @am = Wamupd::AvahiModel.new
             end
         end
 
-        def main
+        # Actually run the program
+        def run
+            # Publish/unpublish static records
             if (@bools[:publish])
                 publish_static
             end
-            
             if (@bools[:unpublish])
                 unpublish_static
             end
+
+            threads = []
+            # Handle the DNS controller
+            threads << Thread.new {
+                @a.on(:quit) {
+                    Thread.exit
+                }
+                @a.on(:added) { |record|
+                    puts "Got a record through the Queue"
+                }
+                @a.run
+            }
+            @am.on(:added) { |avahi_service|
+                puts "Found a new service with D-BUS"
+                puts avahi_service
+                @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
+            }
+            # Handle listening to D-BUS
+            threads << Thread.new {
+                @am.run
+            }
+
+            trap(2) {
+                puts "Quitting"
+                threads.each { |t|
+                    t.exit
+                }
+            }
+
+            threads.each { |t|
+                t.join
+            }
         end
 
         def publish_static
@@ -177,5 +213,5 @@ end
 
 if (__FILE__ == $0)
     w = Wamupd::Main.instance
-    w.main
+    w.run
 end

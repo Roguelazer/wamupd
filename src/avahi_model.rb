@@ -16,12 +16,16 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
+require "avahi_service"
+require "signals"
+
 require "dbus"
 require "set"
-require "avahi_service"
 
 module Wamupd
     class AvahiModel
+        include Signals
+
         def initialize
             @bus = DBus::SystemBus.instance
             @service = @bus.service("org.freedesktop.Avahi")
@@ -34,8 +38,7 @@ module Wamupd
             @count = 0
 
             @known_services = Hash.new
-
-            @pending_questions = 0
+            @handlers = Hash.new
         end
 
         def start_listen
@@ -91,7 +94,6 @@ module Wamupd
                                 mrs.type = "signal"
                                 mrs.interface = "org.freedesktop.Avahi.ServiceResolver"
                                 mrs.path = srb.first
-                                @pending_questions+=1
                                 @bus.add_match(mrs) do |msg,fp|
                                     if (msg.member == "Found")
                                         name = msg.params[2]
@@ -106,11 +108,6 @@ module Wamupd
                                         }
                                         txt = val
                                         add_service_record(name, type, host, port, txt)
-                                    end
-                                    @pending_questions -= 1
-                                    puts "Number of pending questions: #{@pending_questions}"
-                                    if (@pending_questions <= 0)
-                                        @main_loop.quit
                                     end
                                 end
                             end
@@ -129,17 +126,18 @@ module Wamupd
             # doesn't it just use the domain field? who knows?)
             host.sub!(/\.local$/, "")
             a = AvahiService.new(name, {:type=>type, :hostname=>host, :port=>port, :txt=>txt})
-            puts a
+            signal(:added, a)
         end
 
-        def main
+        def run
+            start_listen
+
             @main_loop = DBus::Main.new
+            self.on(:quit) {
+                @main_loop.quit
+            }
             @main_loop << @bus
             @main_loop.run
         end
     end
 end
-
-a = Wamupd::AvahiModel.new
-a.start_listen
-a.main

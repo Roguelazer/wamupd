@@ -151,17 +151,6 @@ module Wamupd
             }
             return retval
         end
-
-        # String coercer
-        def to_s
-            s =  "<AvahiService name='#{@name}' containing #{self.size} records\n"
-            self.each { |as|
-            s += " type=#{as.type}\n"
-            s += " txt=#{as.txt}\n"
-            }
-            s += ">"
-            return s
-        end
     end
 end
 
