@@ -18,11 +18,13 @@
 require "action"
 require "avahi_service"
 require "dns_update"
+require "lease_update"
 require "main_settings"
 require "signals"
 
-require "thread"
+require "algorithms"
 require "dnsruby"
+require "thread"
 
 module Wamupd
     # Duplicate services were registered with the controller.
@@ -45,6 +47,8 @@ module Wamupd
             @resolver = @sa.resolver
             @added = []
             @queue = Queue.new
+            # Make a min priority queue for leases
+            @lease_queue = Containers::PriorityQueue.new { |x,y| (x<=>y) == -1 }
         end
 
         # Add an array of services to the controller
@@ -90,19 +94,9 @@ module Wamupd
 
         # Publish all currently stored records
         def publish_all
-            to_update = []
             @services.each { |key,service|
-                to_update << {:target=>service.type_in_zone,
-                    :type=>Dnsruby::Types.PTR, :ttl=>@sa.ttl,
-                    :value=>service.type_in_zone_with_name}
-                to_update << {:target=>service.type_in_zone_with_name,
-                    :type=>Dnsruby::Types.SRV, :ttl=>@sa.ttl,
-                    :value=> "#{@sa.priority} #{@sa.weight} #{service.port} #{service.target}"}
-                to_update << {:target => service.type_in_zone_with_name,
-                    :type=>Dnsruby::Types.TXT, :ttl=>@sa.ttl,
-                    :value=>service.txt}
+                publish(service)
             }
-            DNSUpdate.publish_all(to_update)
         end
 
         # Unpublish all stored records
@@ -116,14 +110,13 @@ module Wamupd
                     :type=>Dnsruby::Types.PTR,
                     :value=>service.type_in_zone_with_name}
                 todo << { :target=>service.type_in_zone_with_name,
-                    :type=>Dnsruby::Types.TXT,
-                    :value=>service.txt}
+                    :type=>Dnsruby::Types.TXT}
             }
             DNSUpdate.unpublish_all(*todo)
         end
 
         # Publish a single service
-        def publish(service, ttl=@sa.ttl)
+        def publish(service, ttl=@sa.ttl, lease_time=@sa.lease_time)
             to_update = []
             to_update << {:target=>service.type_in_zone,
                 :type=>Dnsruby::Types.PTR, :ttl=>ttl,
@@ -134,6 +127,8 @@ module Wamupd
             to_update << {:target => service.type_in_zone_with_name,
                 :type=>Dnsruby::Types.TXT, :ttl=>ttl,
                 :value=>service.txt}
+            update_time = Time.now() + lease_time
+            @lease_queue.push(Wamupd::LeaseUpdate.new(update_time, service), update_time)
             DNSUpdate.publish_all(to_update)
         end
 
@@ -156,7 +151,7 @@ module Wamupd
             when Wamupd::ActionType::ADD
                 begin
                     add_service(action.record)
-                    publish(action.record, 30)
+                    publish(action.record)
                     signal(:added, action.record)
                 rescue DuplicateServiceError
                     # Do nothing
@@ -184,6 +179,21 @@ module Wamupd
         def run
             while true
                 process_action(@queue.pop)
+            end
+        end
+
+        # Takes care of updating leases. Run it in a separate thread from
+        # the main "run" function
+        def update_leases
+            while true
+                now = Time.now
+                while (not @lease_queue.empty?) and (@lease_queue.next.date < now)
+                    item = @lease_queue.pop
+                    if @services.has_key?(item.service.identifier)
+                        publish(item.service)
+                    end
+                end
+                sleep(@sa.sleep_time)
             end
         end
 

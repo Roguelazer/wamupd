@@ -51,6 +51,7 @@ require "dns_ip_controller"
 require "getoptlong"
 require "rdoc/usage"
 require "singleton"
+require "timeout"
 
 # Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
@@ -144,15 +145,7 @@ module Wamupd
 
         # Actually run the program
         def run
-            # Publish/unpublish static records
-            if (@bools[:publish])
-                publish_static
-                return
-            end
-            if (@bools[:unpublish])
-                unpublish_static
-                return
-            end
+            publish_static
 
             update_queue = Queue.new
             DNSUpdate.queue = update_queue
@@ -172,6 +165,16 @@ module Wamupd
                     }
                     @a.run
                 }
+
+                # Lease maintenance
+                threads << Thread.new {
+                    @a.update_leases
+                }
+
+                threads << Thread.new{
+                    @d.update_leases
+                }
+
                 @am.on(:added) { |avahi_service|
                     @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
                 }
@@ -181,22 +184,31 @@ module Wamupd
                 }
             end
 
-            trap(2) {
+            trap("USR1") {
                 puts "Unregistering services, please wait..."
                 if (@bools[:avahi])
                     @am.exit
                     @a.exit
                 end
-                @d.unpublish
+                if (@bools[:ip])
+                    @d.unpublish
+                end
                 Thread.new {
                     while (DNSUpdate.outstanding.count > 0)
+                        puts "Outstanding count: #{DNSUpdate.outstanding.count}"
                         response_id, response, exception = update_queue.pop
+                        puts "Got response on #{response_id}"
+                        if (not exception.nil?)
+                            puts response
+                            puts exception
+                        end
                         if DNSUpdate.outstanding.delete(response_id).nil?
                             $stderr.puts "Got back an unexpected response"
                             $stderr.puts response
                         end
                     end
-                }.join
+                }
+                sleep($settings.max_dns_response_time)
                 threads.each { |t|
                     t.exit
                 }
@@ -213,8 +225,10 @@ module Wamupd
             end
 
             if (@a)
-                @avahi_services.each { |avahi_service|
-                    @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
+                @avahi_services.each { |avahi_service_file|
+                    avahi_service_file.each { |avahi_service|
+                        @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
+                    }
                 }
             end
         end

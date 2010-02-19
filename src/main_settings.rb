@@ -60,6 +60,17 @@ module Wamupd
         # Current IPv6 address
         attr_reader :ipv6
 
+        # Minimum time to sleep between lease renewal checks
+        attr_reader :sleep_time
+
+        # Maximum time to wait for DNS
+        attr_reader :max_dns_response_time
+
+        # The lease renewal time. By default, ttl * (2/3)
+        def lease_time
+            return (0.667 * @ttl).to_i
+        end
+
         # Constructor. Use the instance() function
         # to actually initialize
         def initialize
@@ -71,6 +82,8 @@ module Wamupd
             @resolver = nil
             @ipv4 = nil
             @ipv6 = nil
+            @sleep_time = 60
+            @max_dns_response_time=10
         end
 
         # Are we using DNSSEC?
@@ -99,7 +112,8 @@ module Wamupd
                 "zone" => :@zone,
                 "ttl" => :@ttl,
                 "srv_priority" => :@priority,
-                "srv_weight" => :@weight
+                "srv_weight" => :@weight,
+                "sleep_time" => :@sleep_time
             }
             properties_map.each { |k,v|
                 if (y.has_key?(k))

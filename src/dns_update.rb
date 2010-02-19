@@ -110,7 +110,11 @@ module Wamupd
             update = Dnsruby::Update.new(sa.zone, "IN")
             args.each { |arg|
                 if (arg.kind_of?(Hash))
-                    update.delete(arg[:target], arg[:type], arg[:value])
+                    if (arg.has_key?(:value))
+                        update.delete(arg[:target], arg[:type], arg[:value])
+                    else
+                        update.delete(arg[:target], arg[:type])
+                    end
                 elsif (arg.kind_of?(Array))
                     update.delete(*arg)
                 else
@@ -120,6 +124,8 @@ module Wamupd
             begin
                 if (async?)
                     queue_id = resolver.send_async(update, @@queue)
+                    puts "ID = #{queue_id}"
+                    puts update
                     @@outstanding << queue_id
                 else
                     resolver.send_message(update)
