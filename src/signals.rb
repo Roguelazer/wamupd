@@ -45,5 +45,7 @@ module Wamupd
                 }
             end
         end
+
+        private :signal
     end
 end

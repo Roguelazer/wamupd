@@ -23,6 +23,10 @@ class TestSignals < Test::Unit::TestCase
 
     class Tester
         include Wamupd::Signals
+
+        def signal2(*args)
+            signal(*args)
+        end
     end
 
     def setup
@@ -31,7 +35,6 @@ class TestSignals < Test::Unit::TestCase
 
     def test_basic
         assert_respond_to(@tester, :on)
-        assert_respond_to(@tester, :signal)
     end
 
     def test_func
@@ -39,7 +42,7 @@ class TestSignals < Test::Unit::TestCase
         @tester.on(:hello) {
             i += 1
         }
-        @tester.signal(:hello)
+        @tester.signal2(:hello)
         assert_equal(1, i)
     end
 
@@ -48,7 +51,7 @@ class TestSignals < Test::Unit::TestCase
         @tester.on(:data) { |d|
             data = d
         }
-        @tester.signal(:data, :result)
+        @tester.signal2(:data, :result)
         assert_not_nil(data)
         assert_equal(:result, data)
     end
