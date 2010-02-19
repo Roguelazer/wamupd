@@ -26,7 +26,7 @@ class TestDNSAvahiStaticController < Test::Unit::TestCase
         dc = nil
         assert_nothing_raised() {
             service = Wamupd::AvahiServiceFile.new(File.join($DATA_BASE, "ssh.service"))
-            dc = Wamupd::DNSAvahiStaticController.new()
+            dc = Wamupd::DNSAvahiController.new()
             dc.add_services(service)
         }
         assert_not_nil(service)
