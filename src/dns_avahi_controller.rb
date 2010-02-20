@@ -26,6 +26,7 @@ require "algorithms"
 require "dnsruby"
 require "thread"
 
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
     # Duplicate services were registered with the controller.
     # Should almost certainly be treated as non-fatal
@@ -33,6 +34,25 @@ module Wamupd
     end
 
     # Coordinate between a set of Avahi Services and DNS records
+    #
+    # == Signals
+    #
+    # [:added] 
+    #    Raised when a new service is added to the controller and
+    #    successfully registered.  has two parameters: the AvahiService
+    #    added and the queue ID of the DNS request (or <tt>true</tt> if the
+    #    request was synchronous)
+    #
+    # [:deleted]
+    #    Raised when a service is deleted from the controller. Contains
+    #    the deleted service as its parameter
+    #
+    # [:renewed] 
+    #    Raised when a service's lease is renewed. Contains the renewed
+    #    service as its parameter
+    #
+    # [:quit]
+    #    Raised when the controller is quitting
     class DNSAvahiController
         include Wamupd::Signals
 
@@ -94,9 +114,11 @@ module Wamupd
 
         # Publish all currently stored records
         def publish_all
+            ids = []
             @services.each { |key,service|
-                publish(service)
+                ids << publish(service)
             }
+            return ids
         end
 
         # Unpublish all stored records
@@ -116,6 +138,8 @@ module Wamupd
         end
 
         # Publish a single service
+        #
+        # Returns: the DNS request ID
         def publish(service, ttl=@sa.ttl, lease_time=@sa.lease_time)
             to_update = []
             to_update << {:target=>service.type_in_zone,
@@ -129,7 +153,7 @@ module Wamupd
                 :value=>service.txt}
             update_time = Time.now() + lease_time
             @lease_queue.push(Wamupd::LeaseUpdate.new(update_time, service), update_time)
-            DNSUpdate.publish_all(to_update)
+            return DNSUpdate.publish_all(to_update)
         end
 
         # Unpublish a single service
@@ -151,8 +175,8 @@ module Wamupd
             when Wamupd::ActionType::ADD
                 begin
                     add_service(action.record)
-                    publish(action.record)
-                    signal(:added, action.record)
+                    id = publish(action.record)
+                    signal(:added, [action.record, id])
                 rescue DuplicateServiceError
                     # Do nothing
                 end
@@ -190,6 +214,7 @@ module Wamupd
                 while (not @lease_queue.empty?) and (@lease_queue.next.date < now)
                     item = @lease_queue.pop
                     if @services.has_key?(item.service.identifier)
+                        signal(:renewed, item.service)
                         publish(item.service)
                     end
                 end

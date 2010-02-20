@@ -18,6 +18,7 @@
 
 require "dnsruby"
 
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
     # Class to help with constructing DNS UPDATEs. Probably not useful except to
     # me.
@@ -73,14 +74,15 @@ module Wamupd
             opt.ttl = 0
             update.add_additional(opt)
             update.header.rd = false
+            queue_id = nil
             begin
-#                if (async?)
-#                    puts "Sending asynchronous request"
-#                    resolver.send_async(update, @@queue)
-#                    @@outstanding += 1
-#                else
-                    resolver.send_message(update)
-#                end
+                if (async?)
+                    queue_id = resolver.send_async(update, @@queue)
+                    @@outstanding << queue_id
+                else
+                   resolver.send_message(update)
+                   queue_id = true
+                end
             rescue Dnsruby::TsigNotSignedResponseError => e
                 # Not really an error for UPDATE; we don't care if the reply is
                 # signed!
@@ -88,6 +90,7 @@ module Wamupd
             rescue Exception => e
                 $stderr.puts "Registration failed: #{e.to_s}"
             end
+            return queue_id
         end
 
         # Publish a single DNS record
@@ -124,8 +127,6 @@ module Wamupd
             begin
                 if (async?)
                     queue_id = resolver.send_async(update, @@queue)
-                    puts "ID = #{queue_id}"
-                    puts update
                     @@outstanding << queue_id
                 else
                     resolver.send_message(update)

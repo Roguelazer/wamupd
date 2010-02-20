@@ -35,11 +35,15 @@ require "xml"
 
 require "avahi_service"
 
-SERVICE_DTD_PATH = "/usr/share/avahi/avahi-service.dtd";
-
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
+    # AvahiServiceFile is a class to abstract Avahi's .service files. It is
+    # capable of loading, parsing, and validating these files into a group
+    # of AvahiService objects.
     class AvahiServiceFile
         include Enumerable
+
+        SERVICE_DTD_PATH = "/usr/share/avahi/avahi-service.dtd";
 
         # Get the name of this service
         def name

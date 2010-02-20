@@ -15,16 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
-    # Mixin for basig signal handling. Woo.
-    
+    # Mixin for basic event-driven processing. Listeners register using the
+    # on function. Classes which include Signals can raise a signal with the
+    # signal function.
     module Signals
         # Add a handler for the specified signal
         #
-        # Args:
-        # name:: An atom for the signal name
-        # &action:: A function
-        def on(name, &action)
+        # *Args:*
+        # [name] An atom of the signal name
+        def on(name, &action) # :yields: parameters
             if (not @handlers)
                 @handlers = Hash.new
             end
@@ -35,7 +36,7 @@ module Wamupd
         end
 
         # Raise a signal. Any additional args will be passed to the handler
-        def signal(name, *args)
+        def signal(name, *args) #:doc:
             if (not @handlers)
                 @handlers = Hash.new
             end

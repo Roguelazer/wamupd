@@ -25,19 +25,20 @@
 #
 # wamupd service-file
 #
+# -a, --avahi
+#   Load Avahi services over D-BUS
 # -A DIRECTORY, --avahi-services DIRECTORY
 #   Load Avahi service definitions from DIRECTORY
 #   If DIRECTORY is not provided, defaults to /etc/avahi/services
+#   If the -A flag is omitted altogether, static records will not be added.
 # -c FILE, --config FILE:
 #   Get configuration data from FILE
 # -i, --ip-addreses (or --no-ip-addresses)
 #   Enable/Disable Publishing A and AAAA records
 # -h, --help:
 #   Show this help
-# -p, --publish
-#   Publish records
-# -u, --unpublish
-#   Unpublish records
+#
+# :title: wamupd
 
 # Update the include path
 $:.push(File.dirname(__FILE__))
@@ -59,12 +60,11 @@ module Wamupd
     OPTS = GetoptLong.new(
         ["--help", "-h", GetoptLong::NO_ARGUMENT],
         ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
-        ["--publish", "-p", GetoptLong::NO_ARGUMENT],
-        ["--unpublish", "-u", GetoptLong::NO_ARGUMENT],
         ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT],
+        ["--avahi", "-a", GetoptLong::NO_ARGUMENT],
         ["--ip-addresses", "-i", GetoptLong::NO_ARGUMENT],
         ["--no-ip-addresses", GetoptLong::NO_ARGUMENT]
-    )
+    ) # :nodoc:
 
     DEFAULT_CONFIG_FILE = "/etc/wamupd.yaml"
     DEFAULT_AVAHI_DIR   = "/etc/avahi/services/"
@@ -79,9 +79,8 @@ module Wamupd
             @avahi_dir = DEFAULT_AVAHI_DIR
 
             boolean_vars = {
-                "--publish" => :publish,
-                "--unpublish" => :unpublish,
-                "--avahi-services" => :avahi,
+                "--avahi" => :avahi,
+                "--avahi-services" => :avahi_services,
                 "--ip-addresses" => :ip
             }
 
@@ -110,6 +109,7 @@ module Wamupd
                 :publish=>false,
                 :unpublish=>false,
                 :avahi=>false,
+                :avahi_services=>false,
                 :ip=>false
             }
 
@@ -125,43 +125,49 @@ module Wamupd
             end
             $settings.load_from_yaml(@config_file)
 
-            if (not (@bools[:avahi] or @bools[:ip]))
-                $stderr.puts "No action specified!"
-                $stderr.puts "Try running with --help (or adding a -i or -A)"
-                exit
-            end
-
             if (@bools[:ip])
                 @d = DNSIpController.new()
             end
 
-            if (@bools[:avahi])
-                @avahi_services = AvahiServiceFile.load_from_directory(@avahi_dir)
+            if (@bools[:avahi] or @bools[:avahi_services])
                 @a = Wamupd::DNSAvahiController.new()
+            end
 
+            if (@bools[:avahi_services])
+                @avahi_services = AvahiServiceFile.load_from_directory(@avahi_dir)
+            end
+            :w
+
+            if (@bools[:avahi])
                 @am = Wamupd::AvahiModel.new
             end
         end
 
-        # Actually run the program
+        # Actually run the program.
+        #
+        # This call doesn't return until SIGTERM is caught.
         def run
+            puts "Starting main function"
             publish_static
 
             update_queue = Queue.new
             DNSUpdate.queue = update_queue
 
             threads = []
-            if (@bools[:avahi])
+            if (@bools[:avahi] or @bools[:avahi_services])
                 # Handle the DNS controller
                 threads << Thread.new {
                     @a.on(:quit) {
                         Thread.exit
                     }
-                    @a.on(:added) { |item|
+                    @a.on(:added) { |item,id|
                         puts "Added #{item.type_in_zone_with_name}"
                     }
                     @a.on(:deleted) { |item|
                         puts "Deleted #{item.type_in_zone_with_name}"
+                    }
+                    @a.on(:renewed) { |item|
+                        puts "Renewed #{item.type_in_zone_with_name}"
                     }
                     @a.run
                 }
@@ -170,11 +176,9 @@ module Wamupd
                 threads << Thread.new {
                     @a.update_leases
                 }
+            end
 
-                threads << Thread.new{
-                    @d.update_leases
-                }
-
+            if (@bools[:avahi])
                 @am.on(:added) { |avahi_service|
                     @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
                 }
@@ -183,31 +187,46 @@ module Wamupd
                     @am.run
                 }
             end
+            
+            if (@bools[:ip])
+                threads << Thread.new{
+                    @d.update_leases
+                }
+            end
 
-            trap("USR1") {
+            threads << Thread.new {
+                while (1)
+                    response_id, response, exception = update_queue.pop
+                    puts "Got back response #{response_id}"
+                    if (not exception.nil?)
+                        if (exception.kind_of?(Dnsruby::TsigNotSignedResponseError))
+                            # Do nothing
+                        else
+                            puts "Error: #{exception}"
+                            puts response
+                        end
+                    end
+                    if (response.rcode != Dnsruby::RCode::NOERROR)
+                        puts response
+                    end
+                    if DNSUpdate.outstanding.delete(response_id).nil?
+                        $stderr.puts "Got back an unexpected response"
+                        $stderr.puts response
+                    end
+                end
+            }
+
+            trap("INT") {
                 puts "Unregistering services, please wait..."
+                if (@bools[:avahi] or @bools[:avahi_services])
+                    @a.exit
+                end
                 if (@bools[:avahi])
                     @am.exit
-                    @a.exit
                 end
                 if (@bools[:ip])
                     @d.unpublish
                 end
-                Thread.new {
-                    while (DNSUpdate.outstanding.count > 0)
-                        puts "Outstanding count: #{DNSUpdate.outstanding.count}"
-                        response_id, response, exception = update_queue.pop
-                        puts "Got response on #{response_id}"
-                        if (not exception.nil?)
-                            puts response
-                            puts exception
-                        end
-                        if DNSUpdate.outstanding.delete(response_id).nil?
-                            $stderr.puts "Got back an unexpected response"
-                            $stderr.puts response
-                        end
-                    end
-                }
                 sleep($settings.max_dns_response_time)
                 threads.each { |t|
                     t.exit
@@ -224,7 +243,7 @@ module Wamupd
                 @d.publish
             end
 
-            if (@a)
+            if (@avahi_services)
                 @avahi_services.each { |avahi_service_file|
                     avahi_service_file.each { |avahi_service|
                         @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
@@ -232,18 +251,8 @@ module Wamupd
                 }
             end
         end
-        
-        def unpublish_static
-            if (@d)
-                @d.unpublish
-            end
 
-            if (@a)
-                @a.unpublish_all
-            end
-        end
-
-        private :process_args
+        private :process_args, :publish_static
     end
 end
 

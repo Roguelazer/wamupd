@@ -16,10 +16,12 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
+require "dnsruby"
 require "singleton"
 require "socket"
 require "yaml"
 
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
     # Simple singleton for storing app-side configuration-type
     # things

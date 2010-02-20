@@ -22,10 +22,28 @@ require "signals"
 require "dbus"
 require "set"
 
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
+    # Model for Avahi's registered services. Uses D-BUS to talk to the
+    # system Avahi daemon and pull down service information. It's kind of a
+    # hack because Avahi has a really (really!) horrible D-BUS interface.
+    #
+    # ==Signals
+    #
+    # [:added]
+    #    A service was added from the system Avahi. Includes the service as
+    #    a parameter.
+    #
+    # [:removed]
+    #    A service was removed from the system Avahi. Includes the service
+    #    as a paramter.
+    #
+    # [:quit]
+    #    The model is quitting.
     class AvahiModel
         include Signals
 
+        # Constructor. Boring.
         def initialize
             @bus = DBus::SystemBus.instance
             @service = @bus.service("org.freedesktop.Avahi")
@@ -41,6 +59,7 @@ module Wamupd
             @handlers = Hash.new
         end
 
+        # Actually starts listening.
         def start_listen
             stb = @server.ServiceTypeBrowserNew(-1,-1,"",0)
             mr = DBus::MatchRule.new
@@ -121,18 +140,32 @@ module Wamupd
             }
         end
 
+        # Construct an AvahiService from the given parameters
         def add_service_record(name, type, host, port, txt)
             # Replace the .local that Avahi sticks at the end of the host (why
             # doesn't it just use the domain field? who knows?)
             host.sub!(/\.local$/, "")
             a = AvahiService.new(name, {:type=>type, :hostname=>host, :port=>port, :txt=>txt})
+            @known_services[a.identifier] = a
             signal(:added, a)
         end
 
+        # Remove an AvahiService using the given parameters.
+        def remove_service_record(name, type, host, port, txt)
+            a = AvahiService.new(name, {:type=>type, :hostname=>host, :port=>port, :txt=>txt})
+            if (@known_services.has_key?(a.identifier))
+                @known_services.delete(a.identifier)
+            end
+            signal(:removed, a)
+        end
+
+        # Exit the listener
         def exit
             signal(:quit)
         end
 
+        # Run the listener. This function doesn't return until
+        # exit is called.
         def run
             start_listen
 
@@ -143,5 +176,7 @@ module Wamupd
             @main_loop << @bus
             @main_loop.run
         end
+
+        private :add_type_listener
     end
 end

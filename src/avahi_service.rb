@@ -14,15 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
-#
-# == Signals
 
-require 'xml'
-
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
-    # A single <service> entry from a service record. A given service (i.e.,
-    # SSH) might have many service entries corresponding to all of the
-    # different ports it is available on
+    # A single <service> entry from a service record. A given service file
+    # (representated by an AvahiServiceFile) may contain many AvahiServices.
     class AvahiService
         attr_reader :type
         attr_reader :subtype
@@ -36,11 +32,13 @@ module Wamupd
             "#{@type},#{@subtype}"
         end
 
+        # The type and name in this zone. Name of the SRV and TXT records
         def type_in_zone_with_name
             sa = MainSettings.instance
             return sa.hostname + "." + @type + "."+ sa.zone
         end
 
+        # The full type in this zone. Goes in the PTR
         def type_in_zone
             sa = MainSettings.instance
             return @type + "." + sa.zone
@@ -62,6 +60,7 @@ module Wamupd
             return retval
         end
 
+        # The target of this service
         def target
             t = ""
             sa = MainSettings.instance
@@ -80,7 +79,7 @@ module Wamupd
 
         # TXT record
         def txt
-            return @txt.nil? ? "\0" : @txt
+            return (@txt.nil? || @txt == "") ? "\0" : @txt
         end
 
         # Initialize

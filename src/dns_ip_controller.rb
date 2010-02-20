@@ -23,6 +23,7 @@ require "dnsruby"
 require "ipaddr"
 require "socket"
 
+# Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
     # Manage IP information in DNS
     class DNSIpController
