@@ -133,7 +133,18 @@ module Wamupd
                         end
                     elsif (item_msg.member == "ItemRemove")
                         if ((item_msg.params[5] & 8) != 0)
-                            puts "Removing item #{item_msg.params[2]}"
+                            name = msg.params[2]
+                            type = msg.params[3]
+                            host = msg.params[5]
+                            address = msg.params[7]
+                            port = msg.params[8]
+                            val = ""
+                            msg.params[9].each { |c|
+                                val += c.pack("c*")
+                                val += " "
+                            }
+                            txt = val
+                            remove_service_record(name, type, host, port, txt)
                         end
                     end
                 end

@@ -26,6 +26,14 @@ require "socket"
 # Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
     # Manage IP information in DNS
+    #
+    # == Signals
+    # [:added]
+    #    A record was published. Parameters are the type (A/AAAA) and the
+    #    address
+    # [:removed]
+    #    A record was unpublished. Parameters are the type (A/AAAA) and the
+    #    address
     class DNSIpController
         include Wamupd::Signals
 
@@ -41,11 +49,11 @@ module Wamupd
         def publish
             if (@sa.ipv4)
                 DNSUpdate.publish(@sa.target, Dnsruby::Types.A, @sa.ttl, @sa.ipv4)
-                puts "Adding A record"
+                signal(:added, Dnsruby::Types.A, @sa.ipv4)
             end
             if (@sa.ipv6)
                 DNSUpdate.publish(@sa.target, Dnsruby::Types.AAAA, @sa.ttl, @sa.ipv6)
-                puts "Adding AAAA record"
+                signal(:added, Dnsruby::Types.AAAA, @sa.ipv6)
             end
             update_time = Time.now() + @sa.lease_time
             @lease_queue.push(Wamupd::LeaseUpdate.new(update_time, nil), update_time)
@@ -60,9 +68,11 @@ module Wamupd
         def unpublish
             if (@sa.ipv4)
                 DNSUpdate.unpublish(@sa.target, Dnsruby::Types.A, @sa.ipv4)
+                signal(:removed, Dnsruby::Types.A, @sa.ipv4)
             end
             if (@sa.ipv6)
                 DNSUpdate.unpublish(@sa.target, Dnsruby::Types.AAAA, @sa.ipv6)
+                signal(:removed, Dnsruby::Types.A, @sa.ipv6)
             end
         end
 

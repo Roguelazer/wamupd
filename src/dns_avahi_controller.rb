@@ -176,7 +176,7 @@ module Wamupd
                 begin
                     add_service(action.record)
                     id = publish(action.record)
-                    signal(:added, [action.record, id])
+                    signal(:added, action.record, id)
                 rescue DuplicateServiceError
                     # Do nothing
                 end

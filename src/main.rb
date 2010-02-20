@@ -37,6 +37,8 @@
 #   Enable/Disable Publishing A and AAAA records
 # -h, --help:
 #   Show this help
+# -v, --verbose
+#   Be verbose
 #
 # :title: wamupd
 
@@ -54,6 +56,8 @@ require "rdoc/usage"
 require "singleton"
 require "timeout"
 
+$verbose = false
+
 # Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
 
@@ -63,7 +67,8 @@ module Wamupd
         ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT],
         ["--avahi", "-a", GetoptLong::NO_ARGUMENT],
         ["--ip-addresses", "-i", GetoptLong::NO_ARGUMENT],
-        ["--no-ip-addresses", GetoptLong::NO_ARGUMENT]
+        ["--no-ip-addresses", GetoptLong::NO_ARGUMENT],
+        ["--verbose", "-v", GetoptLong::NO_ARGUMENT]
     ) # :nodoc:
 
     DEFAULT_CONFIG_FILE = "/etc/wamupd.yaml"
@@ -96,6 +101,8 @@ module Wamupd
                     end
                 when "--no-ip-addresses"
                     @bools[:ip] = false
+                when "--verbose"
+                    $verbose = true
                 end
                 if (boolean_vars.has_key?(opt))
                     @bools[boolean_vars[opt]] = true
@@ -147,7 +154,7 @@ module Wamupd
         #
         # This call doesn't return until SIGTERM is caught.
         def run
-            puts "Starting main function"
+            puts "Starting main function" if $verbose
             publish_static
 
             update_queue = Queue.new
@@ -161,13 +168,13 @@ module Wamupd
                         Thread.exit
                     }
                     @a.on(:added) { |item,id|
-                        puts "Added #{item.type_in_zone_with_name}"
+                        puts "Added #{item.type_in_zone_with_name} (id=\"#{id}\")" if $verbose
                     }
                     @a.on(:deleted) { |item|
-                        puts "Deleted #{item.type_in_zone_with_name}"
+                        puts "Deleted #{item.type_in_zone_with_name}" if $verbose
                     }
                     @a.on(:renewed) { |item|
-                        puts "Renewed #{item.type_in_zone_with_name}"
+                        puts "Renewed #{item.type_in_zone_with_name}" if $verbose
                     }
                     @a.run
                 }
@@ -197,20 +204,21 @@ module Wamupd
             threads << Thread.new {
                 while (1)
                     response_id, response, exception = update_queue.pop
-                    puts "Got back response #{response_id}"
+                    puts "Got back response #{response_id}" if $verbose
                     if (not exception.nil?)
                         if (exception.kind_of?(Dnsruby::TsigNotSignedResponseError))
                             # Do nothing
                         else
-                            puts "Error: #{exception}"
-                            puts response
+                            $stderr.puts "Error: #{exception}"
+                            $stderr.puts response
                         end
                     end
                     if (response.rcode != Dnsruby::RCode::NOERROR)
-                        puts response
+                        $stderr.puts "Got an unexpected rcode (#{response.rcode})"
+                        $stderr.puts response
                     end
                     if DNSUpdate.outstanding.delete(response_id).nil?
-                        $stderr.puts "Got back an unexpected response"
+                        $stderr.puts "Got back an unexpected response ID"
                         $stderr.puts response
                     end
                 end
@@ -240,6 +248,14 @@ module Wamupd
 
         def publish_static
             if (@d)
+                if ($verbose)
+                    @d.on(:added) { |type,address|
+                        puts "Added #{type} record for #{address}"
+                    }
+                    @d.on(:removed) { |type,address|
+                        puts "Removed #{type} record for #{address}"
+                    }
+                end
                 @d.publish
             end
 

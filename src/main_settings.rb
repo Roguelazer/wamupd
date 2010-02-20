@@ -170,6 +170,7 @@ module Wamupd
             rescue Errno::ENETUNREACH => e
                 $stderr.puts "Unable to determine IPv4 address: #{e}"
             end
+            puts "Finished acquiring IPv4 address" if $verbose
 
             begin
                 s = UDPSocket.new(Socket::AF_INET6)
@@ -182,6 +183,7 @@ module Wamupd
             rescue Errno::ENETUNREACH => e
                 $stderr.puts "Unable to determine IPv6 address: #{e}"
             end
+            puts "Finished acquiring IPv6 address" if $verbose
         end
 
         private :make_resolver
