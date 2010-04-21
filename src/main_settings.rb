@@ -17,6 +17,7 @@
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
 require "dnsruby"
+require "ipaddr"
 require "singleton"
 require "socket"
 require "yaml"
@@ -87,6 +88,7 @@ module Wamupd
             @sleep_time = 60
             @max_dns_response_time=10
             @zone = ""
+            @transport = :udp
         end
 
         # Are we using DNSSEC?
@@ -116,7 +118,8 @@ module Wamupd
                 "ttl" => :@ttl,
                 "srv_priority" => :@priority,
                 "srv_weight" => :@weight,
-                "sleep_time" => :@sleep_time
+                "sleep_time" => :@sleep_time,
+                "transport" => :@transport,
             }
             properties_map.each { |k,v|
                 if (y.has_key?(k))
@@ -138,6 +141,11 @@ module Wamupd
             return @resolver
         end
 
+        # Should we be using TCP as our transport?
+        def using_tcp?
+            return (@transport == "tcp" || @transport == :tcp)
+        end
+
         def make_resolver
             if self.using_dnssec?
                 ts = Dnsruby::RR.new_from_hash({
@@ -153,7 +161,7 @@ module Wamupd
                 :port => self.dns_port,
                 :tsig => ts,
                 :dnssec => false,
-                :use_tcp => true
+                :use_tcp => self.using_tcp?,
             })
             
         end

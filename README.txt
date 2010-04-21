@@ -14,6 +14,7 @@ Running:
         not using DNSSEC
       - dnssec_key_hmac: the key value for DNSSEC.
       - ttl: the standard TTL to use.
+      - transport: either "tcp" or "udp"
     * Run with "bin/wamupd -c /path/to/config.yaml -A -a -i
     * Use the -v flag if you want verbosity.
 
