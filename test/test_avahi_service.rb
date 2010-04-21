@@ -45,6 +45,6 @@ class Test::AvahiService < Test::Unit::TestCase
         assert_nil(a.hostname)
         assert_nil(a.domainname)
         assert_nil(a.port)
-        assert_equal("\0", a.txt)
+        assert_equal(false, a.txt)
     end
 end

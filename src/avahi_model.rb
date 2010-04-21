@@ -120,12 +120,7 @@ module Wamupd
                                         host = msg.params[5]
                                         address = msg.params[7]
                                         port = msg.params[8]
-                                        val = ""
-                                        msg.params[9].each { |c|
-                                            val += c.pack("c*")
-                                            val += " "
-                                        }
-                                        txt = val
+                                        txt = Wamupd::AvahiModel.pack_txt_param(msg.params[9])
                                         add_service_record(name, type, host, port, txt)
                                     end
                                 end
@@ -138,17 +133,39 @@ module Wamupd
                             host = msg.params[5]
                             address = msg.params[7]
                             port = msg.params[8]
-                            val = ""
-                            msg.params[9].each { |c|
-                                val += c.pack("c*")
-                                val += " "
-                            }
-                            txt = val
+                            txt = Wamupd::AvahiModel.pack_txt_param(msg.params[9])
                             remove_service_record(name, type, host, port, txt)
                         end
                     end
                 end
             }
+        end
+
+        # Pack an array of TXT parameters into a single TXT record
+        # appropriately
+        #
+        # Note: The actual TXT record should consist of name-value pairs,
+        # with each pair delimited by its length.
+        #
+        # As of 2010-04-21, Dnsruby internally converts double-quoted,
+        # space-separted strings into the appropriate format. Most
+        # annoyingly, if you provide it input already in the right format,
+        # it sticks a completely unnecessary byte on the front and screws it
+        # up.
+        #
+        # Aren't you happy you know that now?
+        def self.pack_txt_param(strs)
+            val = ""
+            strs.each { |c|
+                # Dnsruby uses multi-byte lengths if any of your records are
+                # over 255 characters, though. This makes mDNSResponder get
+                # amusingly confused.
+                if (c.length > 255)
+                    next
+                end
+                val += "\"#{c.pack("c*")}\" "
+            }
+            return val.chop
         end
 
         # Construct an AvahiService from the given parameters

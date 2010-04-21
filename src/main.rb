@@ -39,8 +39,6 @@
 #   Show this help
 # -v, --verbose
 #   Be verbose
-#
-# :title: wamupd
 
 # Update the include path
 $:.push(File.dirname(__FILE__))

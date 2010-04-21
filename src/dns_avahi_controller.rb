@@ -148,9 +148,12 @@ module Wamupd
             to_update << {:target=>service.type_in_zone_with_name,
                 :type=>Dnsruby::Types.SRV, :ttl=>ttl,
                 :value=> "#{@sa.priority} #{@sa.weight} #{service.port} #{service.target}"}
-            to_update << {:target => service.type_in_zone_with_name,
-                :type=>Dnsruby::Types.TXT, :ttl=>ttl,
-                :value=>service.txt}
+            # why doesn't Ruby have !==
+            unless (service.txt === false)
+                to_update << {:target => service.type_in_zone_with_name,
+                    :type=>Dnsruby::Types.TXT, :ttl=>ttl,
+                    :value=>service.txt}
+            end
             update_time = Time.now() + lease_time
             @lease_queue.push(Wamupd::LeaseUpdate.new(update_time, service), update_time)
             return DNSUpdate.publish_all(to_update)

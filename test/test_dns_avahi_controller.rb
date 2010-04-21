@@ -48,42 +48,15 @@ class TestDNSAvahiStaticController < Test::Unit::TestCase
             d.run
         }
         ct = Thread.new {
-            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, Wamupd::AvahiService.new("", {:type=>"test"})))
+            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, Wamupd::AvahiService.new("", {:type=>"test2"})))
             d.queue.push(Wamupd::Action.new(Wamupd::ActionType::QUIT))
         }
         dt.join
         ct.join
-        assert_equal(1, i)
+        assert_equal(2, i)
     end
 
-    def test_parallel_2
-        d = Wamupd::DNSAvahiController.new()
-        i = 0
-        dt = Thread.new {
-            d.on(:added) {
-                i += 1
-            }
-            d.on(:quit) {
-                Thread.exit
-            }
-            d.run
-        }
-        ct = Thread.new {
-            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
-            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
-            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
-        }
-        c2t = Thread.new {
-            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
-            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
-            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::ADD, ""))
-            d.queue.push(Wamupd::Action.new(Wamupd::ActionType::QUIT, ""))
-        }
-        dt.join
-        ct.join
-        c2t.join
-        assert_equal(6, i)
-    end
 
     def test_raise
         d = Wamupd::DNSAvahiController.new

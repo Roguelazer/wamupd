@@ -86,6 +86,7 @@ module Wamupd
             @ipv6 = nil
             @sleep_time = 60
             @max_dns_response_time=10
+            @zone = ""
         end
 
         # Are we using DNSSEC?
@@ -151,7 +152,8 @@ module Wamupd
                 :nameserver => self.dns_server,
                 :port => self.dns_port,
                 :tsig => ts,
-                :dnssec => false
+                :dnssec => false,
+                :use_tcp => true
             })
             
         end

@@ -79,7 +79,7 @@ module Wamupd
 
         # TXT record
         def txt
-            return (@txt.nil? || @txt == "") ? "\0" : @txt
+            return (@txt.nil? || @txt == "") ? false : @txt
         end
 
         # Initialize

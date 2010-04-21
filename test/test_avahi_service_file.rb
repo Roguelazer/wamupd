@@ -38,7 +38,7 @@ class Test::AvahiServiceFile < Test::Unit::TestCase
             assert_equal(22, s.port)
             assert_nil(s.subtype)
             assert_nil(s.hostname)
-            assert_equal("\0", s.txt)
+            assert_equal(false, s.txt)
         }
     end
 
