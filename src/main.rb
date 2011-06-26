@@ -43,6 +43,7 @@
 # Update the include path
 $:.push(File.dirname(__FILE__))
 
+require "rubygems"
 require "avahi_model"
 require "avahi_service"
 require "avahi_service_file"
@@ -50,7 +51,7 @@ require "dns_avahi_controller"
 require "dns_ip_controller"
 
 require "getoptlong"
-require "rdoc/usage"
+require "optparse"
 require "singleton"
 require "timeout"
 
@@ -58,16 +59,73 @@ $verbose = false
 
 # Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
+    Options = Struct.new(:config, :ip_addresses, :avahi, :verbose, :avahi_services_dir, :avahi_services)
+#    $options = Options.new(:config => "/etc/wamupd.yaml", :ip_addresses => false, :avahi => false, :verbose => false, :avahi_services_dir => "/etc/avahi/services/")
+    $options = Options.new
+    $options.config = "/etc/wamupd.yaml"
+    $options.ip_addresses = false
+    $options.avahi = false
+    $options.avahi_services = false
+    $options.verbose = false
+    
+    OptionParser.new do |opts|
+      opts.banner = "Usage: wamupd [options] service-file"
 
-    OPTS = GetoptLong.new(
-        ["--help", "-h", GetoptLong::NO_ARGUMENT],
-        ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
-        ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT],
-        ["--avahi", "-a", GetoptLong::NO_ARGUMENT],
-        ["--ip-addresses", "-i", GetoptLong::NO_ARGUMENT],
-        ["--no-ip-addresses", GetoptLong::NO_ARGUMENT],
-        ["--verbose", "-v", GetoptLong::NO_ARGUMENT]
-    ) # :nodoc:
+      opts.on("-c", "--config FILE", "Get configuration data from FILE") do |cfg|
+        $options.config = cfg
+      end
+
+      opts.on("-A", "--avahi-services [DIRECTORY]", 
+        "Load Avahi service definitions from DIRECTORY",
+        "  If DIRECTORY is not provided, defaults to /etc/avahi/services",
+        "  If the -A flag is omitted altogether, static records will not be added.") do |services|
+        $options.avahi_services_dir = services || "/etc/avahi/services"
+        $options.avahi_services = true
+      end
+
+      opts.on("-i", "--[no-]ip-addresses", "Enable/Disable Publishing A and AAAA records") do |ips|
+        $options.ip_addresses = ips
+      end
+
+      opts.on("-a", "--avahi", "Load Avahi services over D-BUS") do |avahi|
+        $options.avahi = true
+      end 
+
+      opts.on("-h", "--help", "Show this message") do
+        puts opts
+        exit
+      end
+
+      opts.on("-v", "--verbose", "Be verbose") do
+        $options.verbose = true
+      end
+    end.parse!
+
+# wamupd service-file
+#
+# -a, --avahi
+#   Load Avahi services over D-BUS
+# -A DIRECTORY, --avahi-services DIRECTORY
+#   Load Avahi service definitions from DIRECTORY
+#   If DIRECTORY is not provided, defaults to /etc/avahi/services
+#   If the -A flag is omitted altogether, static records will not be added.
+# -c FILE, --config FILE:
+#   Get configuration data from FILE
+# -i, --ip-addreses (or --no-ip-addresses)
+#   Enable/Disable Publishing A and AAAA records
+# -h, --help:
+#   Show this help
+# -v, --verbose
+#   Be verbose
+#    OPTS = GetoptLong.new(
+#        ["--help", "-h", GetoptLong::NO_ARGUMENT],
+#        ["--config", "-c", GetoptLong::REQUIRED_ARGUMENT],
+#        ["--avahi-services", "-A", GetoptLong::OPTIONAL_ARGUMENT],
+#        ["--avahi", "-a", GetoptLong::NO_ARGUMENT],
+#        ["--ip-addresses", "-i", GetoptLong::NO_ARGUMENT],
+#        ["--no-ip-addresses", GetoptLong::NO_ARGUMENT],
+#        ["--verbose", "-v", GetoptLong::NO_ARGUMENT]
+#    ) # :nodoc:
 
     DEFAULT_CONFIG_FILE = "/etc/wamupd.yaml"
     DEFAULT_AVAHI_DIR   = "/etc/avahi/services/"
@@ -87,25 +145,32 @@ module Wamupd
                 "--ip-addresses" => :ip
             }
 
-            OPTS.each do |opt,arg|
-                case opt
-                when "--help"
-                    RDoc::usage
-                when "--config"
-                    @config_file = arg.to_s
-                when "--avahi-services"
-                    if (not arg.nil? and arg != "")
-                        @avahi_dir=arg
-                    end
-                when "--no-ip-addresses"
-                    @bools[:ip] = false
-                when "--verbose"
-                    $verbose = true
-                end
-                if (boolean_vars.has_key?(opt))
-                    @bools[boolean_vars[opt]] = true
-                end
-            end
+            @config_file = $options.config
+            @avahi_dir = $options.avahi_services_dir
+            @bools[:ip] = $options.ip_addresses
+            $verbose = $options.verbose
+            @bools[:avahi] = $options.avahi
+            @bools[:avahi_services] = $options.avahi_services
+
+#            OPTS.each do |opt,arg|
+#                case opt
+#                when "--help"
+#                    RDoc::usage
+#                when "--config"
+#                    @config_file = arg.to_s
+#                when "--avahi-services"
+#                    if (not arg.nil? and arg != "")
+#                        @avahi_dir=arg
+#                    end
+#                when "--no-ip-addresses"
+#                    @bools[:ip] = false
+#                when "--verbose"
+#                    $verbose = true
+#                end
+#                if (boolean_vars.has_key?(opt))
+#                    @bools[boolean_vars[opt]] = true
+#                end
+#            end
         end
 
         # Construct the object and process all command-line options
