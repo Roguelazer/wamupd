@@ -227,9 +227,6 @@ module Wamupd
             if (@bools[:avahi] or @bools[:avahi_services])
                 # Handle the DNS controller
                 threads << Thread.new {
-                    @a.on(:quit) {
-                        Thread.exit
-                    }
                     @a.on(:added) { |item,id|
                         puts "Added #{item.type_in_zone_with_name} (id=\"#{id}\")" if $verbose
                     }

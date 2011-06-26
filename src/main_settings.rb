@@ -120,6 +120,7 @@ module Wamupd
                 "srv_weight" => :@weight,
                 "sleep_time" => :@sleep_time,
                 "transport" => :@transport,
+                "max_dns_response_time" => :@max_dns_response_time,
             }
             properties_map.each { |k,v|
                 if (y.has_key?(k))

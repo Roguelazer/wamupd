@@ -83,7 +83,7 @@ module Wamupd
                 mr = DBus::MatchRule.new
                 mr.type = "signal"
                 mr.interface = "org.freedesktop.Avahi.ServiceBrowser"
-                mr.path = sb.first
+                mr.path = sb
                 @bus.add_match(mr) do |item_msg, first_param|
                     if (item_msg.member == "ItemNew")
                         # From avahi-common/defs.h:
