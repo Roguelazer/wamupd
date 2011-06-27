@@ -59,27 +59,35 @@ $verbose = false
 
 # Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
+    DEFAULT_CONFIG_FILE = "/usr/local/etc/wamupd.yaml"
+    DEFAULT_AVAHI_SERVICES_DIR = "/usr/local/etc/avahi/services"
+
     Options = Struct.new(:config, :ip_addresses, :avahi, :verbose, :avahi_services_dir, :avahi_services)
 #    $options = Options.new(:config => "/etc/wamupd.yaml", :ip_addresses => false, :avahi => false, :verbose => false, :avahi_services_dir => "/etc/avahi/services/")
     $options = Options.new
-    $options.config = "/etc/wamupd.yaml"
+    $options.config = DEFAULT_CONFIG_FILE
     $options.ip_addresses = false
     $options.avahi = false
     $options.avahi_services = false
+    $options.avahi_services_dir = DEFAULT_AVAHI_SERVICES_DIR
     $options.verbose = false
     
     OptionParser.new do |opts|
       opts.banner = "Usage: wamupd [options] service-file"
 
-      opts.on("-c", "--config FILE", "Get configuration data from FILE") do |cfg|
+      opts.on("-c", "--config FILE", 
+          "Get configuration data from FILE",
+            "If FILE is not provided, defaults to " + DEFAULT_CONFIG_FILE) do |cfg|
         $options.config = cfg
       end
 
       opts.on("-A", "--avahi-services [DIRECTORY]", 
         "Load Avahi service definitions from DIRECTORY",
-        "  If DIRECTORY is not provided, defaults to /etc/avahi/services",
+        "  If DIRECTORY is not provided, defaults to " + DEFAULT_AVAHI_SERVICES_DIR,
         "  If the -A flag is omitted altogether, static records will not be added.") do |services|
-        $options.avahi_services_dir = services || "/etc/avahi/services"
+        if services then
+          $options.avahi_services_dir = services
+        end
         $options.avahi_services = true
       end
 
@@ -127,18 +135,12 @@ module Wamupd
 #        ["--verbose", "-v", GetoptLong::NO_ARGUMENT]
 #    ) # :nodoc:
 
-    DEFAULT_CONFIG_FILE = "/etc/wamupd.yaml"
-    DEFAULT_AVAHI_DIR   = "/etc/avahi/services/"
-
     # Main wamupd object
     class Main
         include Singleton
 
         # Process command-line objects
         def process_args
-            @config_file = DEFAULT_CONFIG_FILE
-            @avahi_dir = DEFAULT_AVAHI_DIR
-
             boolean_vars = {
                 "--avahi" => :avahi,
                 "--avahi-services" => :avahi_services,
@@ -175,6 +177,8 @@ module Wamupd
 
         # Construct the object and process all command-line options
         def initialize
+            @exiting = false
+
             @bools = {
                 :publish=>false,
                 :unpublish=>false,
@@ -218,7 +222,6 @@ module Wamupd
         # This call doesn't return until SIGTERM is caught.
         def run
             puts "Starting main function" if $verbose
-            publish_static
 
             update_queue = Queue.new
             DNSUpdate.queue = update_queue
@@ -245,6 +248,8 @@ module Wamupd
                 }
             end
 
+            publish_static
+            
             if (@bools[:avahi])
                 @am.on(:added) { |avahi_service|
                     @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
@@ -284,26 +289,34 @@ module Wamupd
                 end
             }
 
-            trap("INT") {
-                puts "Unregistering services, please wait..."
-                if (@bools[:avahi] or @bools[:avahi_services])
-                    @a.exit
-                end
-                if (@bools[:avahi])
-                    @am.exit
-                end
-                if (@bools[:ip])
-                    @d.unpublish
-                end
-                sleep($settings.max_dns_response_time)
-                threads.each { |t|
-                    t.exit
-                }
-            }
+            trap(1, proc { exit(threads) })
+            trap(2, proc { exit(threads) })
+            trap(15, proc { exit(threads) })
 
             threads.each { |t|
                 t.join
             }
+        end
+
+        def exit(threads)
+          if (not @exiting) then
+            @exiting = true
+
+            puts "Unregistering services, please wait..."
+            if (@bools[:avahi] or @bools[:avahi_services])
+                @a.exit
+            end
+            if (@bools[:avahi])
+                @am.exit
+            end
+            if (@bools[:ip])
+                @d.unpublish
+            end
+            sleep($settings.max_dns_response_time)
+            threads.each { |t|
+                t.exit
+            }
+          end
         end
 
         def publish_static
@@ -328,7 +341,7 @@ module Wamupd
             end
         end
 
-        private :process_args, :publish_static
+        private :process_args, :publish_static, :exit
     end
 end
 
