@@ -33,7 +33,7 @@
 
 require "xml"
 
-require "avahi_service"
+require "wamupd/avahi_service"
 
 # Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd

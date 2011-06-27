@@ -15,12 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
-require "action"
-require "avahi_service"
-require "dns_update"
-require "lease_update"
-require "main_settings"
-require "signals"
+require "wamupd/action"
+require "wamupd/avahi_service"
+require "wamupd/dns_update"
+require "wamupd/lease_update"
+require "wamupd/main_settings"
+require "wamupd/signals"
 
 require "algorithms"
 require "dnsruby"

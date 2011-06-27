@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
-require "avahi_service"
-require "signals"
+require "wamupd/avahi_service"
+require "wamupd/signals"
 
 require "dbus"
 require "set"
