@@ -112,7 +112,7 @@ module Wamupd
                                 mrs = DBus::MatchRule.new
                                 mrs.type = "signal"
                                 mrs.interface = "org.freedesktop.Avahi.ServiceResolver"
-                                mrs.path = srb.first
+                                mrs.path = srb
                                 @bus.add_match(mrs) do |msg,fp|
                                     if (msg.member == "Found")
                                         name = msg.params[2]
