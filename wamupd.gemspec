@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name              = "wamupd"
-  s.version           = "0.9"
+  s.version           = "1.0"
   s.platform          = Gem::Platform::RUBY
   s.authors           = ["Jonathan Walker", "roguelazer"]
   s.email             = ["kallous@gmail.com"]
