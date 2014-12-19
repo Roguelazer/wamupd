@@ -33,7 +33,7 @@
 
 require "xml"
 
-require "avahi_service"
+require "wamupd/avahi_service"
 
 # Wamupd is a module that is used to namespace all of the wamupd code.
 module Wamupd
@@ -43,7 +43,7 @@ module Wamupd
     class AvahiServiceFile
         include Enumerable
 
-        SERVICE_DTD_PATH = "/usr/share/avahi/avahi-service.dtd";
+        SERVICE_DTD_PATH = "/usr/local/share/avahi/avahi-service.dtd";
 
         # Get the name of this service
         def name

@@ -120,6 +120,7 @@ module Wamupd
                 "srv_weight" => :@weight,
                 "sleep_time" => :@sleep_time,
                 "transport" => :@transport,
+                "max_dns_response_time" => :@max_dns_response_time,
             }
             properties_map.each { |k,v|
                 if (y.has_key?(k))
@@ -182,18 +183,18 @@ module Wamupd
             end
             puts "Finished acquiring IPv4 address" if $verbose
 
-            begin
-                s = UDPSocket.new(Socket::AF_INET6)
-                s.connect("2001:4860:b006::2", 1)
-                if (s.addr[0] == "AF_INET6")
-                    @ipv6 = IPAddr.new(s.addr.last)
-                end
-            rescue SocketError => e
-                $stderr.puts "Unable to determine IPv6 address: #{e}"
-            rescue Errno::ENETUNREACH => e
-                $stderr.puts "Unable to determine IPv6 address: #{e}"
-            end
-            puts "Finished acquiring IPv6 address" if $verbose
+#            begin
+#                s = UDPSocket.new(Socket::AF_INET6)
+#                s.connect("2001:4860:b006::2", 1)
+#                if (s.addr[0] == "AF_INET6")
+#                    @ipv6 = IPAddr.new(s.addr.last)
+#                end
+#            rescue SocketError => e
+#                $stderr.puts "Unable to determine IPv6 address: #{e}"
+#            rescue Errno::ENETUNREACH => e
+#                $stderr.puts "Unable to determine IPv6 address: #{e}"
+#            end
+#            puts "Finished acquiring IPv6 address" if $verbose
         end
 
         private :make_resolver

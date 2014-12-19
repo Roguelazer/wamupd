@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
-require "lease_update"
-require "main_settings"
+require "wamupd/lease_update"
+require "wamupd/main_settings"
 
 require "algorithms"
 require "dnsruby"

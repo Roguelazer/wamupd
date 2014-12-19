@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
 
-require "avahi_service"
-require "signals"
+require "wamupd/avahi_service"
+require "wamupd/signals"
 
 require "dbus"
 require "set"
@@ -83,7 +83,7 @@ module Wamupd
                 mr = DBus::MatchRule.new
                 mr.type = "signal"
                 mr.interface = "org.freedesktop.Avahi.ServiceBrowser"
-                mr.path = sb.first
+                mr.path = sb
                 @bus.add_match(mr) do |item_msg, first_param|
                     if (item_msg.member == "ItemNew")
                         # From avahi-common/defs.h:
@@ -112,7 +112,7 @@ module Wamupd
                                 mrs = DBus::MatchRule.new
                                 mrs.type = "signal"
                                 mrs.interface = "org.freedesktop.Avahi.ServiceResolver"
-                                mrs.path = srb.first
+                                mrs.path = srb
                                 @bus.add_match(mrs) do |msg,fp|
                                     if (msg.member == "Found")
                                         name = msg.params[2]

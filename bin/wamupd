@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/local/bin/ruby
 # Copyright (C) 2009-2010 James Brown <roguelazer@roguelazer.com>.
 #
 # This file is part of wamupd.
@@ -15,6 +15,300 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with wamupd.  If not, see <http://www.gnu.org/licenses/>.
+#
+# == Synopsis
+# 
+# wamupd: Read avahi service descriptions and current IP information, then
+# use that information to generate Wide-Area mDNS Updates
+#
+# == Usage
+#
+# wamupd service-file
+#
+# -a, --avahi
+#   Load Avahi services over D-BUS
+# -A DIRECTORY, --avahi-services DIRECTORY
+#   Load Avahi service definitions from DIRECTORY
+#   If DIRECTORY is not provided, defaults to /etc/avahi/services
+#   If the -A flag is omitted altogether, static records will not be added.
+# -c FILE, --config FILE:
+#   Get configuration data from FILE
+# -i, --ip-addreses (or --no-ip-addresses)
+#   Enable/Disable Publishing A and AAAA records
+# -h, --help:
+#   Show this help
 
-SRCDIR=$(dirname $(dirname "$0"))/src
-ruby "${SRCDIR}/main.rb" "$@"
+require 'rubygems'
+require 'daemons'
+
+options = {
+  :dir_mode   => :system,
+  :multiple   => false,
+}
+
+Daemons.run_proc('wamupd', options) do 
+
+    require "wamupd"
+    require "getoptlong"
+    require "optparse"
+    require "singleton"
+    require "timeout"
+    require "logger"
+
+    # Wamupd is a module that is used to namespace all of the wamupd code.
+    module Wamupd
+        DEFAULT_CONFIG_FILE = "/usr/local/etc/wamupd.yaml"
+        DEFAULT_AVAHI_SERVICES_DIR = "/usr/local/etc/avahi/services"
+
+        app = Daemons.controller.group.applications.first
+
+        Options = Struct.new(:config, :ip_addresses, :avahi, :avahi_services_dir, :avahi_services)
+        $options = Options.new
+        $options.config = DEFAULT_CONFIG_FILE
+        $options.ip_addresses = false
+        $options.avahi = false
+        $options.avahi_services = false
+        $options.avahi_services_dir = DEFAULT_AVAHI_SERVICES_DIR
+       
+        OptionParser.new do |opts|
+          opts.banner = "Usage: wamupd run -- [options] service-file"
+
+          opts.on("-c", "--config FILE", 
+              "Get configuration data from FILE",
+                "If FILE is not provided, defaults to " + DEFAULT_CONFIG_FILE) do |cfg|
+            $options.config = cfg
+          end
+
+          opts.on("-A", "--avahi-services [DIRECTORY]", 
+            "Load Avahi service definitions from DIRECTORY",
+            "  If DIRECTORY is not provided, defaults to " + DEFAULT_AVAHI_SERVICES_DIR,
+            "  If the -A flag is omitted altogether, static records will not be added.") do |services|
+            if services then
+              $options.avahi_services_dir = services
+            end
+            $options.avahi_services = true
+          end
+
+          opts.on("-i", "--[no-]ip-addresses", "Enable/Disable Publishing A and AAAA records") do |ips|
+            $options.ip_addresses = ips
+          end
+
+          opts.on("-a", "--avahi", "Load Avahi services over D-BUS") do |avahi|
+            $options.avahi = true
+          end 
+
+          opts.on("-h", "--help", "Show this message") do
+            puts opts
+            exit
+          end
+        end.parse!(app.app_argv)
+
+        unless Daemons.controller.options[:ontop]
+            $logger = Logger.new(app.logfile, 'monthly')
+            $logger.level = Logger::INFO
+        else
+            $logger = Logger.new(STDOUT)
+            $logger.level = Logger::DEBUG
+        end
+    
+        CurrentProcess.change_privilege('nobody', 'nogroup')
+
+
+        # Main wamupd object
+        class Main
+            include Singleton
+
+            # Process command-line objects
+            def process_args
+                @config_file = $options.config
+                @avahi_dir = $options.avahi_services_dir
+                @bools[:ip] = $options.ip_addresses
+                @bools[:avahi] = $options.avahi
+                @bools[:avahi_services] = $options.avahi_services
+            end
+
+            # Construct the object and process all command-line options
+            def initialize
+                @exiting = false
+
+                @bools = {
+                    :publish=>false,
+                    :unpublish=>false,
+                    :avahi=>false,
+                    :avahi_services=>false,
+                    :ip=>false
+                }
+
+                $settings = MainSettings.instance()
+
+                process_args()
+
+                # Load settings
+                if (not File.exists?(@config_file))
+                    $stderr.puts "Could not find configuration file #{@config_file}"
+                    $stderr.puts "Try running with --help?"
+                    exit
+                end
+                $settings.load_from_yaml(@config_file)
+
+                if (@bools[:ip])
+                    @d = DNSIpController.new()
+                end
+
+                if (@bools[:avahi] or @bools[:avahi_services])
+                    @a = Wamupd::DNSAvahiController.new()
+                end
+
+                if (@bools[:avahi_services])
+                    @avahi_services = AvahiServiceFile.load_from_directory(@avahi_dir)
+                end
+                :w
+
+                if (@bools[:avahi])
+                    @am = Wamupd::AvahiModel.new
+                end
+            end
+
+            # Actually run the program.
+            #
+            # This call doesn't return until SIGTERM is caught.
+            def run
+                $logger.debug "Starting main function"
+
+                update_queue = Queue.new
+                DNSUpdate.queue = update_queue
+
+                threads = []
+                if (@bools[:avahi] or @bools[:avahi_services])
+                    # Handle the DNS controller
+                    threads << Thread.new {
+                        @a.on(:added) { |item,id|
+                            $logger.debug('dns_controller') { "Added #{item.type_in_zone_with_name} (id=\"#{id}\")" }
+                        }
+                        @a.on(:deleted) { |item|
+                            $logger.debug('dns_controller') { "Deleted #{item.type_in_zone_with_name}" }
+                        }
+                        @a.on(:renewed) { |item|
+                            $logger.debug('dns_controller') { "Renewed #{item.type_in_zone_with_name}" }
+                        }
+                        @a.run
+                    }
+
+                    # Lease maintenance
+                    threads << Thread.new {
+                        @a.update_leases
+                    }
+                end
+
+                publish_static
+                
+                if (@bools[:avahi])
+                    @am.on(:added) { |avahi_service|
+                        @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
+                        $logger.debug('avahi_listener') { "Found service: #{avahi_service}" }
+                    }
+                    # Handle listening to D-BUS
+                    threads << Thread.new {
+                        $logger.debug('dbus_listener') { "Starting" }
+                        @am.run
+                    }
+                end
+                
+                if (@bools[:ip])
+                    threads << Thread.new{
+                        $logger.debug('ip_controller') { "Starting" }
+                        @d.update_leases
+                    }
+                end
+
+                threads << Thread.new {
+                    while (1)
+                        response_id, response, exception = update_queue.pop
+                        $logger.debug('reporter') { "Got back response #{response_id}" }
+                        if (not exception.nil?)
+                            if (exception.kind_of?(Dnsruby::TsigNotSignedResponseError))
+                                # Do nothing
+                            else
+                                $logger.warn('reporter') { "Error: #{exception}" }
+                                $logger.warn('reporter') { response }
+                            end
+                        end
+                        if (response.rcode != Dnsruby::RCode::NOERROR)
+                            $logger.warn('reporter') { "Got an unexpected rcode (#{response.rcode})" }
+                            $logger.warn('reporter') { response }
+                        end
+                        if DNSUpdate.outstanding.delete(response_id).nil?
+                            $logger.warn('reporter') { "Got back an unexpected response ID" }
+                            $logger.warn('reporter') { response }
+                        end
+                    end
+                }
+
+                stop_proc = proc { stop_threads(threads) }
+                trap(1, stop_proc)
+                trap(2, stop_proc)
+                trap(15, stop_proc)
+
+                $logger.info "Wamupd started"
+                while (!@exiting)
+                  sleep(10)
+                end
+
+                threads.each { |t|
+                    t.join
+                }
+
+              exit
+            end
+
+            def stop_threads(threads)
+              if (not @exiting) then
+                @exiting = true
+
+                $logger.info "Unregistering services..."
+                if (@bools[:avahi] or @bools[:avahi_services])
+                    @a.exit
+                end
+                if (@bools[:avahi])
+                    @am.exit
+                end
+                if (@bools[:ip])
+                    @d.unpublish
+                end
+                sleep($settings.max_dns_response_time)
+                threads.each { |t|
+                    t.exit
+                }
+                $logger.info "Wamupd stopped"
+              end
+            end
+
+            def publish_static
+                if (@d)
+                    @d.on(:added) { |type,address|
+                        $logger.debug('static_publisher') { "Added #{type} record for #{address}" }
+                    }
+                    @d.on(:removed) { |type,address|
+                        $logger.debug('static_publisher') { "Removed #{type} record for #{address}" }
+                    }
+                    @d.publish
+                end
+
+                if (@avahi_services)
+                    @avahi_services.each { |avahi_service_file|
+                        avahi_service_file.each { |avahi_service|
+                            @a.queue << Wamupd::Action.new(Wamupd::ActionType::ADD, avahi_service)
+                            $logger.debug('static_publisher') { "Found static Avahi service: #{avahi_service}" }
+                        }
+                    }
+                end
+            end
+
+            private :process_args, :publish_static, :exit
+        end
+    end
+
+
+    w = Wamupd::Main.instance
+    w.run
+end
